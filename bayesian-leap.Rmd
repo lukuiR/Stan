@@ -1,0 +1,112 @@
+---
+title: "Taking the Bayesian Leap"
+author: Andrew B. Collier
+date: eRum (Budapest), 15 May 2018
+output: 
+  revealjs::revealjs_presentation:
+    self_contained: false
+    reveal_plugins: ["zoom", "notes"]
+---
+
+<!--
+    Other resources:
+
+    - http://rpubs.com/pviefers/CologneR [has interesting example of hierarchical model]
+    - https://www.youtube.com/watch?v=s-9itaL1v-o "Extending the Power of R with Stan" [focus on rstanarm package]
+
+    - http://m-clark.github.io/docs/IntroBayes.html
+    - https://www.youtube.com/watch?v=uSjsJg8fcwY
+    - https://vimeo.com/132156595
+    - https://www.youtube.com/watch?v=qQFF4tPgeWI
+    - https://www.youtube.com/watch?v=pHsuIaPbNbY
+-->
+
+## Bayesian
+
+<blockquote>
+T hegreatest obstacle that I encounter among students and colleagues is the tacit belief that the proper objective of statistical inference is to test null hypotheses.3 This is the proper objective, the thinking goes, because Karl Popper argued that science advances by falsifying hypotheses. Karl Popper (1902–1994) is possibly the most influential philosopher of science, at least among scientists. He did persuasively argue that science works better by developing hypotheses that are, in principle, falsifiable. Seeking out evidence that might embarrass our ideasis anormativestandard,andonethatmostscholars—whethertheydescribethemselves as scientists or not—subscribe to. So maybe statistical procedures should falsify hypotheses, if we wish to be good statistical scientists.
+</blockquote>
+
+## Bayesian Inference
+
+Data $y$ and a model with parameters $\theta$.
+
+Bayes' Theorem
+$$
+p(\theta|y, X) = \frac{p(y|X, \theta) p(\theta)}{p(y)} \propto p(y|\theta) p(\theta)
+$$
+where
+
+- prior — $p(\theta)$ is parameter distribution <em>before</em> data;
+- likelihood — $p(y|X, \theta)$ is probability of data <em>given</em> parameters; and
+- posterior — $p(\theta|y, X)$ is parameter distribution <em>given</em> data.
+
+## Example: Bernoulli and Binomial Likelihoods
+
+$$
+p(y|\theta) = \binom{n}{y} \theta^y (1 - \theta)^{n - y}
+$$
+
+<aside class="notes">
+With more complicated models it is seldom possible to write an analytical expression for the posterior.
+</aside>
+
+## So much for Theory...
+
+Analytical expressions are rare in practice.
+
+Confounding features:
+
+- data are often multi-dimensional;
+- models have multiple parameters.
+
+So evaluating $p(\theta|y)$ becomes challenging!
+
+## ... resort to Simulation!
+
+Metropolis-Hastings algorithm.
+
+## More Efficient Simulation!
+
+Hamiltonian Monte Carlo.
+
+## Image
+
+<img src="https://cdn.rawgit.com/stan-dev/logos/0f0922d5/logo_name_banner.svg" />
+
+High level language for writing statistical models.
+
+## Bare Bones Stan
+
+<script src="https://gist.github.com/DataWookie/61d7a662ecaad87044e1c9f161a5245f.js"></script>
+
+## Running Stan from R
+
+Stan workflow:
+
+- Write Stan program.
+- Stan parser converts this to C++.
+- Compile C++.
+- Execute compiled binary.
+
+Using `rstan`:
+
+- RStudio recognises `.stan` files.
+- Steps automated.
+
+## Parameter Uncertainty
+
+Frequentist approach does not quantify uncertainty in model parameters.
+
+## Distribution of Hit Rate
+
+What is the distribution of the hit rate?
+
+(Spoiler: It's not Normal.)
+
+## Resources
+
+- <a href="http://mc-stan.org/">Stan web site</a>
+- <a href="http://www.mcmchandbook.net/HandbookChapter5.pdf">MCMC Using Hamiltonian Dynamics</a> (Radford Neal)
+- Blogs:
+  - <http://andrewgelman.com/>
