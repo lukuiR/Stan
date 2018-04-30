@@ -10,6 +10,14 @@ h2, p {
   box-shadow: none;
 }
 
+.reveal pre {
+  box-shadow: none;
+  width: 100%;
+}
+.reveal pre > code {
+  background-color: rgba(52, 152, 219, 0.25);
+}
+
 /* Two column output (use a <div> for each column). */
 
 #left {
