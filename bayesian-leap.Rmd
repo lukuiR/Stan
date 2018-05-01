@@ -1,11 +1,16 @@
 ---
 title: "Taking the Bayesian Leap"
+subtitle: "Maud goes to Vegas"
 author: Andrew B. Collier
-date: eRum (Budapest), 15 May 2018
+location: eRum (Budapest)
+date: 15 May 2018
 output: 
   revealjs::revealjs_presentation:
     self_contained: false
+    transition: none
     reveal_plugins: ["zoom", "notes"]
+    template: datawookie-reveal-markdown-template.html
+    css: datawookie-reveal-markdown.css
 ---
 
 <!--
@@ -13,19 +18,176 @@ output:
 
     - http://rpubs.com/pviefers/CologneR [has interesting example of hierarchical model]
     - https://www.youtube.com/watch?v=s-9itaL1v-o "Extending the Power of R with Stan" [focus on rstanarm package]
+    - https://vimeo.com/132156595
 
     - http://m-clark.github.io/docs/IntroBayes.html
     - https://www.youtube.com/watch?v=uSjsJg8fcwY
-    - https://vimeo.com/132156595
     - https://www.youtube.com/watch?v=qQFF4tPgeWI
     - https://www.youtube.com/watch?v=pHsuIaPbNbY
+    
+    - https://matthewdharris.com/2016/10/18/estimating-a-beta-distribution-with-stan-hmc/
+    - http://blackwell.math.yorku.ca/MATH6635/2016/Day17/MCMC_with_STAN_examples.html
 -->
+
+```{r setup, include=FALSE, warning=FALSE, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, comment = NA)
+
+library(rstan)
+library(dplyr)
+library(purrr)
+library(ggplot2)
+library(knitr)
+```
+
+![](img/logo-toptal.png)
+
+<aside class="notes">
+Enough about me. I want you to meet somebody else.
+</aside>
+
+## {data-background="img/maud-introduction.svg" data-background-size="80%" data-background-position="left bottom"}
+
+<aside class="notes">
+Meet my friend Maud.
+
+Maud is 71. She likes cats and gardening. SOMETHING ELSE.
+
+Maud has a gambling problem.
+</aside>
+
+## {data-background="img/maud-love-r.svg" data-background-size="80%" data-background-position="left bottom"}
+
+## {data-background="img/slot-machine.jpg"}
+
+# Cats vs Mice
+
+## Paytable
+
+```{r include=FALSE}
+paytable <- data.frame(
+  payout = c(0, 1, 2, 5, 10, 20, 100),
+  frequency = c(700, 166, 80, 33, 15, 5, 1),
+  symbol = c("", rep(c("mouse", "cat"), 3)),
+  repeats = c(0, 1, 1, 2, 2, 3, 3),
+  stringsAsFactors = FALSE
+) %>% mutate(
+  symbols = map2(symbol, repeats, function(sym, n) {ifelse(sym == "", "", emo::ji(sym)) %>% rep(n) %>% paste(collapse = "")})
+) %>% select(frequency, payout, symbols)
+```
+```{r paytable}
+paytable
+```
+```{r include=FALSE}
+paytable <- paytable %>% mutate(
+  probability = frequency / sum(frequency)
+)
+```
+
+## Data
+
+```{r create_data, include=FALSE}
+SESSIONS <- 100
+AVGSPINS <- 20
+
+sessions <- tibble(
+  spins = rpois(SESSIONS, AVGSPINS)
+) %>% mutate(
+  # Generate samples for individual spins.
+  #
+  details = pmap(., function(spins) {
+    data.frame(
+      wager = 1,
+      payout = sample(paytable$payout, spins, TRUE, paytable$frequency)
+    )
+  }),
+  session = 1:SESSIONS
+)
+
+sessions <- inner_join(
+  sessions,
+  sessions %>%
+    tidyr::unnest() %>%
+    group_by(session) %>%
+    summarise(
+      hits = sum(payout > 0),
+      wager = sum(wager),
+      payout = sum(payout)
+    )
+  ) %>%
+  mutate(
+    hit_rate = hits / spins,
+    rtp = payout / wager
+  ) %>%
+  select(session, details, everything())
+```
+
+```{r}
+head(sessions)
+```
+
+## Hit Rate
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(sessions, aes(x = hit_rate)) +
+  geom_histogram() +
+  scale_x_continuous("Hit Rate", limits = c(0, 1))
+```
+
+```{r include=FALSE}
+binom_likelihood <- function(theta, k, n) {
+  prod(choose(n, k) * theta^k * (1 - theta)^(n - k))
+  #
+  # Equivalent to dbinom(k, size = n, prob = theta)
+}
+
+# Neglect the choose(n, k) since it's a constant (as a function of theta).
+#
+# theta - probability [single value]
+# k - number of successes [vector]
+# n - number of trials [vector]
+#
+binom_log_likelihood <- function(theta, k, n) {
+  sum(k * log10(theta) + (n - k) * log10(1 - theta))
+}
+```
+
+## Maximum Likelihood
+
+```{r}
+binom_likelihood(0.6, sessions$hits, sessions$spins)
+binom_log_likelihood(0.6, sessions$hits, sessions$spins)
+
+parameters <- tibble(theta = seq(0, 1, 0.02)) %>%
+  mutate(
+    likelihood = sapply(theta, binom_likelihood, sessions$hits, sessions$spins),
+    log_likelihood = sapply(theta, binom_log_likelihood, sessions$hits, sessions$spins)
+  )
+
+ggplot(parameters, aes(theta, log_likelihood)) + geom_point()
+
+parameters %>% arrange(desc(log_likelihood)) %>% head()
+```
+
+<aside class="notes">
+This gives us a point estimate for the parameter.
+</aside>
 
 ## Bayesian
 
 <blockquote>
 T hegreatest obstacle that I encounter among students and colleagues is the tacit belief that the proper objective of statistical inference is to test null hypotheses.3 This is the proper objective, the thinking goes, because Karl Popper argued that science advances by falsifying hypotheses. Karl Popper (1902–1994) is possibly the most influential philosopher of science, at least among scientists. He did persuasively argue that science works better by developing hypotheses that are, in principle, falsifiable. Seeking out evidence that might embarrass our ideasis anormativestandard,andonethatmostscholars—whethertheydescribethemselves as scientists or not—subscribe to. So maybe statistical procedures should falsify hypotheses, if we wish to be good statistical scientists.
 </blockquote>
+
+## Bayesian: Not everybody's a fan
+
+<blockquote>
+... the theory of inverse probability is founded upon error and must be wholly rejected.
+<cite>Sir Ronald Fisher (1925)</cite>
+</blockquote>
+
+<aside class="notes">
+Historically the Bayesian approach has been marginalised by some eminent statisticians. For example, Ronald Fisher had this to say about inverse probability as Bayesian inference was known in his day.
+</aside>
 
 ## Bayesian Inference
 
@@ -62,6 +224,84 @@ Confounding features:
 
 So evaluating $p(\theta|y)$ becomes challenging!
 
+## Grid Approximation
+
+```{r}
+prior <- tibble(
+  theta = seq(0, 1, 0.02),
+  update = 0
+)
+
+prior_unif <- prior %>% mutate(
+  p = 1
+)
+prior_trig <- prior %>% mutate(
+  p = ifelse(theta < 0.5, 2 * theta, 2 - 2 * theta)
+)
+
+binom_update <- function(prior, k, n) {
+  likelihood <- sapply(prior$theta, binom_likelihood, k, n)
+  #
+  prior %>% mutate(
+    # Update.
+    p = likelihood * p,
+    # Normalise.
+    p = p / sum(p)
+  )
+}
+
+plot(p ~ theta, prior_unif)
+plot(p ~ theta, binom_update(prior_unif, 1, 3))
+
+plot(p ~ theta, prior_trig)
+plot(p ~ theta, binom_update(prior_trig, 1, 3))
+```
+
+## foo
+
+```{r}
+for (n in 1:11) {
+  hits = sessions[[n, "hits"]]
+  spins = sessions[[n, "spins"]]
+  prior_unif <- rbind(prior_unif, binom_update(prior_unif %>% filter(update == n - 1), hits, spins) %>% mutate(update = update + 1))
+  prior_trig <- rbind(prior_trig, binom_update(prior_trig %>% filter(update == n - 1), hits, spins) %>% mutate(update = update + 1))
+}
+
+prior_unif$prior = "Uniform"
+prior_trig$prior = "Triangle"
+#
+priors = rbind(prior_unif, prior_trig)
+```
+
+## foo
+
+```{r}
+ggplot(prior_unif, aes(x = theta, y = p)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~ update, scales = "free_y")
+```
+
+## foo
+
+```{r}
+
+ggplot(prior_trig, aes(x = theta, y = p)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~ update, scales = "free_y")
+```
+
+## foo
+
+```{r}
+
+ggplot(priors, aes(x = theta, y = p)) +
+  geom_line(aes(col = prior)) +
+  # geom_point() +
+  facet_wrap(~ update, scales = "free_y")
+```
+
 ## ... resort to Simulation!
 
 Metropolis-Hastings algorithm.
@@ -69,6 +309,14 @@ Metropolis-Hastings algorithm.
 ## More Efficient Simulation!
 
 Hamiltonian Monte Carlo.
+
+The NUTS sampling algorithm is *much* more efficient than vanilla MCMC.
+
+Treat the parameter vector like the coordinates of a particle on a potential energy surface, where the potential energy is the negative log posterior.
+
+## Stan Skeleton
+
+<script src="https://gist.github.com/DataWookie/61d7a662ecaad87044e1c9f161a5245f.js"></script>
 
 ## Image
 
@@ -89,10 +337,143 @@ Stan workflow:
 - Compile C++.
 - Execute compiled binary.
 
+Requirements:
+
+- `.R` file
+- `.stan` file
+
 Using `rstan`:
 
 - RStudio recognises `.stan` files.
 - Steps automated.
+
+## Stan 1
+
+```{r stan_binomial, message=FALSE, warning=FALSE, results='hide', cache=TRUE}
+library(rstan)
+
+trials <- list(
+  N       = nrow(sessions),
+  hits    = sessions$hits,
+  spins   = sessions$spins
+)
+
+fit <- stan(
+  file    = "sessions-binomial-no-prior.stan",
+  data    = trials,
+  chains  = 4,                         # Number of Markov chains
+  warmup  = 1000,                      # Number of warmup iterations per chain
+  iter    = 2000,                      # Total number of iterations per chain
+  refresh = 1000                       # Iterations between status update
+)
+```
+
+## Stan Results
+
+```{r}
+fit
+```
+
+<aside class="notes">
+`n_eff` is the effective number of samples.
+</aside>
+
+## Stan 2
+
+```{r}
+# Stan is generating draws from the posterior and the results (below) are based on those draws.
+
+print(fit, pars=c("mu", "lp__"), probs=c(.1,.5,.9))
+
+plot(fit)
+
+# posterior_interval(fit, prob = 0.5) # Is this function from rstanarm?
+#
+# You can literally say that "there is a 25% chance that it's smaller than..."
+
+traceplot(fit, pars = c("mu"), inc_warmup = TRUE, nrow = 2)
+
+pairs(fit, pars = c("mu", "lp__"), las = 1)
+```
+
+## Stan 3
+
+```{r stan_poisson, message=FALSE, warning=FALSE, results='hide', cache=TRUE}
+trials <- list(
+  N       = nrow(sessions),
+  spins   = sessions$spins
+)
+
+fit <- stan(
+  # file    = "sessions-poisson.stan",
+  file    = "https://gist.githubusercontent.com/DataWookie/ade71f9e6bffcee87a48a1d097c4b6e5/raw/081f8d7104d32ed28f2e3dad2f85140b8e01ec48/sessions-poisson.stan",
+  data    = trials,
+  chains  = 4,
+  warmup  = 1000,
+  iter    = 2000,
+  refresh = 1000
+)
+```
+
+## Stan
+
+```{r}
+extract(fit)
+
+# hist(extract(fit)$lambda)
+```
+
+<aside class="notes">
+These are samples from the posterior.
+</aside>
+
+## Stan 4
+
+```{r cache=TRUE}
+ggplot(sessions, aes(x = payout / wager)) + geom_histogram()
+```
+
+## Stan 5
+
+```{r echo=FALSE, cache=FALSE}
+read_chunk("sessions-normal.stan")
+```
+
+```{text stan_normal, message=FALSE, warning=FALSE, eval=FALSE}
+```
+
+<aside class="notes">
+I know that the explicit loop is probably making you cringe. But Stan converts this into C++ code. And that code is compiled. The loop actually ends up being remarkably efficient.
+</aside>
+
+## Stan 6
+
+```{r message=FALSE, warning=FALSE, results='hide', cache=TRUE}
+trials <- list(
+  N       = nrow(sessions),
+  wager   = sessions$wager,
+  payout  = sessions$payout
+)
+
+fit <- stan(
+  file    = "sessions-normal.stan",
+  data    = trials,
+  chains  = 4,
+  warmup  = 1000,
+  iter    = 2000,
+  refresh = 1000
+)
+```
+
+## Stan 7
+
+```{r}
+pairs(fit, pars = c("mu", "sigma", "lp__"), las = 1)
+```
+
+## Predictive Inference
+
+
 
 ## Parameter Uncertainty
 
@@ -103,6 +484,14 @@ Frequentist approach does not quantify uncertainty in model parameters.
 What is the distribution of the hit rate?
 
 (Spoiler: It's not Normal.)
+
+## ShinyStan
+
+library(shinystan)
+launch_shinystan(fit)
+#
+# Diagnose -> PPcheck "Posterior predictive check" (look at distribution of observed data versus replications - do they look similar? "If our model is a good fit then we should be able to use it to generate data that looks a lot like the data we observed.")
+
 
 ## Resources
 
