@@ -553,10 +553,7 @@ $if(progress)$
         // Display a presentation progress bar
         progress: $progress$,
 $endif$
-$if(slideNumber)$
-        // Display the page number of the current slide
-        slideNumber: $slideNumber$,
-$endif$
+        slideNumber: true,
 $if(history)$
         // Push each slide change to the browser history
         history: $history$,
