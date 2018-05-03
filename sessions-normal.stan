@@ -1,3 +1,4 @@
+## @knitr stan_normal
 data {
   int<lower=0> N;
   int wager[N];
