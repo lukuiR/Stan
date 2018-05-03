@@ -140,6 +140,19 @@ ggplot(sessions, aes(x = hit_rate)) +
 ```
 
 ```{r include=FALSE}
+y = c(0, 0, 1, 1, 1)
+
+# Log-likelihood of a parameter value given the data.
+#
+bernoulli_likelihood <- function(theta, y) {
+  sum(y * log(theta) + (1 - y) * log(1 - theta))
+}
+
+bernoulli_likelihood(0.3, y)
+bernoulli_likelihood(0.6, y)
+```
+
+```{r include=FALSE}
 binom_likelihood <- function(theta, k, n) {
   prod(choose(n, k) * theta^k * (1 - theta)^(n - k))
   #
@@ -156,6 +169,19 @@ binom_log_likelihood <- function(theta, k, n) {
   sum(k * log10(theta) + (n - k) * log10(1 - theta))
 }
 ```
+
+<aside class="notes">
+For many applications, the natural logarithm of the likelihood function,
+called the log-likelihood, is more convenient to work with. Because the
+logarithm is a strictly increasing function, the logarithm of a function
+achieves its maximum value at the same points as the function itself, and
+hence the log-likelihood can be used in place of the likelihood in maximum
+likelihood estimation and related techniques. Finding the maximum of a
+function often involves taking the derivative of a function and solving for
+the parameter being maximized, and this is often easier when the function
+being maximized is a log-likelihood rather than the original likelihood
+function.
+</aside>
 
 ## Maximum Likelihood
 
@@ -179,6 +205,10 @@ For now, weneedtolearnhowtocombinesamplingofsimulatedobservations, as in the pre
 </blockquote>
 
 <aside class="notes">
+IF WE WERE TAKING MAXIMUM LIKELIHOOD APPROACH THEN WE WOULD JUST CHOOSE THETA WHICH MAXIMISES LIKELIHOOD.
+
+BAYESIAN APPROACH IS DIFFERENT BECAUSE WE FACTOR IN EXISTING BELIEFS ABOUT THE DISTRIBUTION OF THETA.
+
 This gives us a point estimate for the parameter.
 </aside>
 
@@ -367,6 +397,39 @@ Using `rstan`:
 - RStudio recognises `.stan` files.
 - Steps automated.
 
+
+
+<aside class="notes">
+1. Represent a statistical model by writing its log posterior density (up to
+an normalizing constant that does not depend on the unknown parameters in the
+model) using the Stan modeling language. We recommend using a separate file
+with a .stan extension, although it can also be done using a character string
+within R.
+2. Translate the Stan program to C++ code using the stanc function.
+3. Compile the C++ code to create a DSO (also called a dynamic link library
+(DLL)) that can be loaded by R.
+4. Run the DSO to sample from the posterior distribution.
+5. Diagnose non-convergence of the MCMC chains.
+6. Conduct inference based on the posterior sample (the MCMC draws from the
+posterior distribution).
+
+As mentioned earlier in the vignette, Stan programs are written in the Stan
+modeling language, translated to C++ code, and then compiled to a dynamic
+shared object (DSO). The DSO is then loaded by R and executed to draw the
+posterior sample. The process of compiling C++ code to DSO sometimes takes a
+while. When the model is the same, we can reuse the DSO from a previous run.
+The stan function accepts the optional argument fit, which can be used to pass
+an existing fitted model object so that the compiled model is reused. When
+reusing a previous fitted model, we can still specify different values for the
+other arguments to stan, including passing different data to the data
+argument.
+
+In addition, if fitted models are saved using functions like save and
+save.image, RStan is able to save DSOs, so that they can be used across R
+sessions. To avoid saving the DSO, specify save_dso=FALSE when calling the
+stan function.
+</aside>
+
 ## Stan 1 .stan
 
 ```{r echo=FALSE, cache=FALSE}
@@ -378,6 +441,16 @@ read_chunk("sessions-binomial-no-prior.stan")
 
 <aside class="notes">
 The ~ represents a stochastic relationship. An = would indicate a deterministic relationship.
+
+The number of Markov chains to run can be specified using the chains argument
+to the stan or sampling functions. By default, the chains are executed
+serially (i.e., one at a time) using the parent R process. There is also an
+optional cores argument that can be set to the number of chains (if the
+hardware has sufficient processors and RAM), which is appropriate on most
+laptops. We typically recommend first calling
+options(mc.cores=parallel::detectCores()) once per R session so that all
+available cores can be used without needing to manually specify the cores
+argument.
 </aside>
 
 ## Stan 1 .R
@@ -473,6 +546,22 @@ plot(fit)
 traceplot(fit, pars = c("mu"), inc_warmup = TRUE, nrow = 2)
 
 pairs(fit, pars = c("mu", "lp__"), las = 1)
+```
+
+---
+
+```{r}
+plot(fit, show_density = TRUE, ci_level = 0.5, fill_color = "purple")
+```
+---
+
+```{r}
+plot(fit, plotfun = "hist", pars = "mu", include = FALSE)
+```
+---
+
+```{r}
+plot(fit, plotfun = "trace", pars = c("mu"), inc_warmup = TRUE) + ggtitle("Example of adding title to plot")
 ```
 
 ## Stan 3
@@ -573,6 +662,8 @@ trials <- list(
   y       = sessions$wager
 )
 
+options(mc.cores = parallel::detectCores())
+
 fit <- stan(
   file    = "sessions-regression.stan",
   data    = trials,
@@ -607,6 +698,7 @@ launch_shinystan(fit)
 
 ## Resources
 
+- http://mc-stan.org/workshops/
 - <a href="http://mc-stan.org/">Stan web site</a>
 - <a href="http://www.mcmchandbook.net/HandbookChapter5.pdf">MCMC Using Hamiltonian Dynamics</a> (Radford Neal)
 - Blogs:
