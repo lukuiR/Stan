@@ -503,28 +503,32 @@ $endfor$
     <div class="slides">
 <!-- Title Page -->
 $if(title)$
-<section data-background="img/slide-background.svg">
+<section data-background="img/slide-background.svg" class="center" id="title-page">
     <h1 class="title">$title$</h1>
 $if(subtitle)$
   <h1 class="subtitle">$subtitle$</h1>
 $endif$
 $for(author)$
     <h2 class="author">$author$</h2>
+    <div class="author-info">
+        <i class="fa fa-envelope"></i> andrew@exegetic.biz
+        |
+        <i class="fab fa-twitter"></i> <a href="https://twitter.com/DataWookie">DataWookie</a>
+        |
+        <i class="fab fa-github"></i> <a href="https://github.com/DataWookie">DataWookie</a>
+    </div>
 $endfor$
 $if(location)$
-    <h3 class="date">$location$</h3>
+    <h3 class="location">$location$</h3>
 $endif$
 $if(date)$
     <h3 class="date">$date$</h3>
 $endif$
-    <br><br>
-    <div class="author-info">
-        <i class="fa fa-envelope fa-lg"></i> andrew@exegetic.biz
-        |
-        <i class="fab fa-twitter fa-lg"></i> <a href="https://twitter.com/DataWookie">DataWookie</a>
-        |
-        <i class="fab fa-github fa-lg"></i> <a href="https://github.com/DataWookie">DataWookie</a>
-    </div>
+$if(title_logo)$
+$for(title_logo)$
+    <img src="$title_logo$" class="logo" height="80px">
+$endfor$
+$endif$
 </section>
 $endif$
 $if(toc)$

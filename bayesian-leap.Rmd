@@ -4,6 +4,9 @@ subtitle: "Maud goes to Vegas"
 author: Andrew B. Collier
 location: eRum (Budapest)
 date: 15 May 2018
+title_logo:
+- "img/logo-toptal.png"
+- "img/logo-exegetic.svg"
 output: 
   revealjs::revealjs_presentation:
     self_contained: false
@@ -21,9 +24,9 @@ output:
     - https://vimeo.com/132156595
 
     - http://m-clark.github.io/docs/IntroBayes.html
-    - https://www.youtube.com/watch?v=uSjsJg8fcwY
-    - https://www.youtube.com/watch?v=qQFF4tPgeWI
-    - https://www.youtube.com/watch?v=pHsuIaPbNbY
+    - https://www.youtube.com/watch?v=uSjsJg8fcwY [Michael Betancourt - "Some Bayesian Modeling Techniques in Stan"]
+    - https://www.youtube.com/watch?v=qQFF4tPgeWI [Bob Carpenter]
+    - https://www.youtube.com/watch?v=pHsuIaPbNbY [Michael Betancourt - "Efficient Bayesian inference with Hamiltonian Monte Carlo"]
     
     - https://matthewdharris.com/2016/10/18/estimating-a-beta-distribution-with-stan-hmc/
     - http://blackwell.math.yorku.ca/MATH6635/2016/Day17/MCMC_with_STAN_examples.html
