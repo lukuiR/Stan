@@ -14,7 +14,11 @@ output:
     reveal_plugins: ["zoom", "notes"]
     template: datawookie-reveal-markdown-template.html
     css: datawookie-reveal-markdown.css
+editor_options: 
+  chunk_output_type: console
 ---
+
+# {data-background="img/maud-introduction.svg" data-background-size="50%" data-background-position="left bottom"}
 
 <!--
     Other resources:
@@ -22,10 +26,10 @@ output:
     - http://rpubs.com/pviefers/CologneR [has interesting example of hierarchical model]
     - https://www.youtube.com/watch?v=s-9itaL1v-o "Extending the Power of R with Stan" [focus on rstanarm package]
     - https://vimeo.com/132156595
+    - https://www.youtube.com/watch?v=qQFF4tPgeWI [Bob Carpenter. Background information. No demo of Stan.]
+    - https://www.youtube.com/watch?v=uSjsJg8fcwY [Michael Betancourt - "Some Bayesian Modeling Techniques in Stan". Mostly linear models.]
 
     - http://m-clark.github.io/docs/IntroBayes.html
-    - https://www.youtube.com/watch?v=uSjsJg8fcwY [Michael Betancourt - "Some Bayesian Modeling Techniques in Stan"]
-    - https://www.youtube.com/watch?v=qQFF4tPgeWI [Bob Carpenter]
     - https://www.youtube.com/watch?v=pHsuIaPbNbY [Michael Betancourt - "Efficient Bayesian inference with Hamiltonian Monte Carlo"]
     
     - https://matthewdharris.com/2016/10/18/estimating-a-beta-distribution-with-stan-hmc/
@@ -33,24 +37,19 @@ output:
 -->
 
 ```{r setup, include=FALSE, warning=FALSE, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, comment = NA)
+knitr::opts_chunk$set(echo = TRUE, comment = NA, fig.width = 7.5)
 
-library(rstan)
 library(dplyr)
-# library(purrr)
+library(tidyr)
+library(rstan)
 library(ggplot2)
+library(icon)
 library(knitr)
 ```
 
-![](img/logo-toptal.png)
-
 <aside class="notes">
 Enough about me. I want you to meet somebody else.
-</aside>
 
-## {data-background="img/maud-introduction.svg" data-background-size="50%" data-background-position="left bottom"}
-
-<aside class="notes">
 Meet my friend Maud.
 
 Maud is 71. She likes cats and gardening. SOMETHING ELSE.
@@ -58,13 +57,7 @@ Maud is 71. She likes cats and gardening. SOMETHING ELSE.
 Maud has a gambling problem.
 </aside>
 
-## {data-background="img/maud-love-r.svg" data-background-size="50%" data-background-position="left bottom"}
-
 ## {data-background="img/slot-machine.jpg"}
-
-# Cats vs Mice
-
-## Paytable
 
 ```{r include=FALSE}
 paytable <- data.frame(
@@ -74,19 +67,18 @@ paytable <- data.frame(
   repeats = c(0, 1, 1, 2, 2, 3, 3),
   stringsAsFactors = FALSE
 ) %>% mutate(
-  symbols = purrr::map2(symbol, repeats, function(sym, n) {ifelse(sym == "", "", emo::ji(sym)) %>% rep(n) %>% paste(collapse = "")})
+  symbols = purrr::map2(symbol, repeats, function(sym, n) {ifelse(sym == "", "", emo::ji(sym)) %>% rep(n) %>% paste(collapse = "")}),
+  probability = frequency / sum(frequency)
 ) %>% select(frequency, payout, symbols)
 ```
-```{r paytable}
-paytable
-```
-```{r include=FALSE}
-paytable <- paytable %>% mutate(
-  probability = frequency / sum(frequency)
-)
-```
 
-## Data
+## {data-background="img/maud-love-r.svg" data-background-size="50%" data-background-position="left bottom"}
+
+<aside class="notes">
+It's been really useful to have Maud as a collaborator.
+</aside>
+
+## Data (by Session)
 
 ```{r create_data, include=FALSE}
 SESSIONS <- 100
@@ -95,6 +87,10 @@ AVGSPINS <- 20
 # Probability of wagering 1, 2 or 3 coins per spin.
 #
 COINPROB = c(0.8, 0.15, 0.05)
+
+# Seed chosen so that first session has fewer than 10 spins.
+#
+set.seed(538)
 
 sessions <- tibble(
   spins = rpois(SESSIONS, AVGSPINS)
@@ -110,7 +106,7 @@ sessions <- tibble(
     )
   }),
   session = 1:SESSIONS
-)
+) %>% select(session, spins, details)
 
 sessions <- inner_join(
   sessions,
@@ -131,110 +127,196 @@ sessions <- inner_join(
 ```
 
 ```{r}
-head(sessions)
+sessions %>% select(-details)
 ```
 
-## Hit Rate
+## Data (by Spin)
 
-```{r echo=FALSE, message=FALSE, warning=FALSE}
+```{r}
+sessions %>% select(session, details) %>% unnest()
+```
+
+# Binomial Process
+
+---
+
+A binomial distribution describes the probability of
+
+- $k$ successes in $n$ trials where
+- the probability of success on any trial is $\theta$.
+
+Probability distribution for binomial process (single trial):
+
+$$
+P(k | n, \theta) = \binom{n}{k} \theta^k (1 - \theta)^{n - k}
+$$
+
+<aside class="notes">
+This is useful if you know $\theta$ and the number of trials and you want to calculate the probability of a given number of successes. But what if you want to go the other way: you've observed $k$ successes from $n$ trials and you want to estimate $\theta$?
+</aside>
+
+---
+
+Simple estimate of probability of success:
+
+$$
+\text{hit rate} = \theta^* = \frac{\text{hits}}{\text{spins}}
+$$
+
+---
+
+Probability distribution for binomial process (single trial):
+
+$$
+P(k | n, \theta) = \binom{n}{k} \theta^k (1 - \theta)^{n - k}
+$$
+
+where
+
+- $k$ successes in $n$ trials where
+- the probability of success on any trial is $\theta$.
+
+---
+
+### One Massive Binomial Experiment
+
+```{r}
+with(sessions, sum(hits) / sum(spins))
+```
+
+---
+
+### Series of Binomial Experiments
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=3}
 ggplot(sessions, aes(x = hit_rate)) +
   geom_histogram() +
-  scale_x_continuous("Hit Rate", limits = c(0, 1))
+  scale_x_continuous("Hit Rate", limits = c(0, 1), labels = scales::percent) +
+  scale_y_continuous("Count") +
+  theme_classic()
 ```
 
+```{r}
+sessions %>% summarise(
+  session_avg = mean(hit_rate),
+  session_std = sd(hit_rate)
+)
+```
+
+<aside class="notes">
+The simplest way to calculate the hit rate is to simply take the ratio of the total number of hits to the total number of spins across all sessions. The problem with this is that it gives no indication of uncertainty.
+
+Another approach is to calculate statistics per session. Now you can calculate the average and spread. However, there are two problems with this:
+
+1. it ignores the number of spins per session (this could be incorporated by using weighted statistics) and
+2. it assumes that the hit rate is Normally distributed (and it's not!).
+</aside>
+
+---
+
+What if we have data for multiple sessions?
+
+For session $i$ there were $k_i$ hits from $n_i$ spins.
+
+---
+
 ```{r include=FALSE}
-y = c(0, 0, 1, 1, 1)
+y <- c(0, 1, 0, 0, 1, 1, 0)
 
 # Log-likelihood of a parameter value given the data.
 #
-bernoulli_likelihood <- function(theta, y) {
+bernoulli_log_likelihood <- function(theta, y) {
   sum(y * log(theta) + (1 - y) * log(1 - theta))
 }
 
-bernoulli_likelihood(0.3, y)
-bernoulli_likelihood(0.6, y)
+bernoulli_log_likelihood(0.3, y)
+bernoulli_log_likelihood(0.6, y)
 ```
 
 ```{r include=FALSE}
-binom_likelihood <- function(theta, k, n) {
+binom_probability <- function(theta, k, n) {
   prod(choose(n, k) * theta^k * (1 - theta)^(n - k))
   #
   # Equivalent to dbinom(k, size = n, prob = theta)
 }
+```
 
-# Neglect the choose(n, k) since it's a constant (as a function of theta).
-#
+Assuming that sessions are independent:
+
+$$
+P(k | n, \theta) = \prod_i P(k_i | n_i, \theta) = L(\theta; n, k)
+$$
+
+<aside class="notes">
+$P(k | n, \theta)$ and $L(\theta; n, k)$ are functionally equivalent but
+
+- $P(k | n, \theta)$ is a function of $k$ (and is a probability distribution) and
+- $L(\theta; n, k)$ is a function of $\theta$ (and is *not* a probability distribution).
+</aside>
+
+---
+
+Log-likelihood for binomial process (multiple trials):
+
+$$
+LL(\theta; n, k) = \sum_i k_i \log{\theta} + (n_i - k_i) \log{(1 - \theta)}
+$$
+
+```{r echo=FALSE}
+binom_likelihood <- function(theta, k, n) {
+  prod(theta^k * (1 - theta)^(n - k))
+}
+```
+
+```{r}
 # theta - probability [single value]
 # k - number of successes [vector]
 # n - number of trials [vector]
 #
 binom_log_likelihood <- function(theta, k, n) {
-  sum(k * log10(theta) + (n - k) * log10(1 - theta))
+  sum(k * log(theta) + (n - k) * log(1 - theta))
 }
 ```
 
 <aside class="notes">
-For many applications, the natural logarithm of the likelihood function,
-called the log-likelihood, is more convenient to work with. Because the
-logarithm is a strictly increasing function, the logarithm of a function
-achieves its maximum value at the same points as the function itself, and
-hence the log-likelihood can be used in place of the likelihood in maximum
-likelihood estimation and related techniques. Finding the maximum of a
-function often involves taking the derivative of a function and solving for
-the parameter being maximized, and this is often easier when the function
-being maximized is a log-likelihood rather than the original likelihood
-function.
+Neglect the binomial coefficient since it's a constant (as a function of theta).
+
+The log likelihood is generally easier to work with because it gets around the problem of multiplying together many small numbers.
+
+Because the logarithm is a strictly increasing function, the log likelihood is maximised in the same place as the likelihood.
 </aside>
 
-## Maximum Likelihood
+---
 
-```{r}
-binom_likelihood(0.6, sessions$hits, sessions$spins)
+```{r include=FALSE}
+binom_log_likelihood(0.6, sessions$hits, sessions$spins)
 binom_log_likelihood(0.6, sessions$hits, sessions$spins)
 
 parameters <- tibble(theta = seq(0, 1, 0.02)) %>%
   mutate(
-    likelihood = sapply(theta, binom_likelihood, sessions$hits, sessions$spins),
     log_likelihood = sapply(theta, binom_log_likelihood, sessions$hits, sessions$spins)
   )
+```
 
+```{r echo=FALSE}
 ggplot(parameters, aes(theta, log_likelihood)) + geom_point()
+```
 
+```{r}
 parameters %>% arrange(desc(log_likelihood)) %>% head()
 ```
 
-<blockquote>
-For now, weneedtolearnhowtocombinesamplingofsimulatedobservations, as in the previous section, with sampling parameters from the posterior distribution. We expect to dobetter whenweusetheentireposterior distribution, not just some point estimate derived from it. Why? Because there is a lot of information about uncertainty in the entire posterior distribution. We lose this information when we pluck out a single parameter value and then perform calculations with it. This loss of information leads to overconfidence.
-</blockquote>
-
 <aside class="notes">
-IF WE WERE TAKING MAXIMUM LIKELIHOOD APPROACH THEN WE WOULD JUST CHOOSE THETA WHICH MAXIMISES LIKELIHOOD.
+In the Maximum Likelihood approach we simply select the value of the parameter which gives the largest likelihood.
 
-BAYESIAN APPROACH IS DIFFERENT BECAUSE WE FACTOR IN EXISTING BELIEFS ABOUT THE DISTRIBUTION OF THETA.
+The assumption implicit in this approach is that in the absence of data all parameter values are equally probable.
 
-This gives us a point estimate for the parameter.
-</aside>
+This gives us a point estimate for the parameter. There is no indication of uncertainty. Such a paucity of information leads to overconfidence in the quality of the estimate.
 
-## Bayesian
-
-<blockquote>
-T hegreatest obstacle that I encounter among students and colleagues is the tacit belief that the proper objective of statistical inference is to test null hypotheses.3 This is the proper objective, the thinking goes, because Karl Popper argued that science advances by falsifying hypotheses. Karl Popper (1902–1994) is possibly the most influential philosopher of science, at least among scientists. He did persuasively argue that science works better by developing hypotheses that are, in principle, falsifiable. Seeking out evidence that might embarrass our ideasis anormativestandard,andonethatmostscholars—whethertheydescribethemselves as scientists or not—subscribe to. So maybe statistical procedures should falsify hypotheses, if we wish to be good statistical scientists.
-</blockquote>
-
-## Bayesian: Not everybody's a fan
-
-<blockquote>
-... the theory of inverse probability is founded upon error and must be wholly rejected.
-<cite>Sir Ronald Fisher (1925)</cite>
-</blockquote>
-
-<aside class="notes">
-Historically the Bayesian approach has been marginalised by some eminent statisticians. For example, Ronald Fisher had this to say about inverse probability as Bayesian inference was known in his day.
+A confidence interval would be an improvement. An entire distribution would be even better.
 </aside>
 
 ## Bayesian Inference
-
-Data $y$ and a model with parameters $\theta$.
 
 Bayes' Theorem
 $$
@@ -242,38 +324,49 @@ p(\theta|y, X) = \frac{p(y|X, \theta) p(\theta)}{p(y)} \propto p(y|\theta) p(\th
 $$
 where
 
+- $y$ are observations;
+- $X$ are predictors;
 - prior — $p(\theta)$ is parameter distribution <em>before</em> data;
 - likelihood — $p(y|X, \theta)$ is probability of data <em>given</em> parameters; and
 - posterior — $p(\theta|y, X)$ is parameter distribution <em>given</em> data.
 
 <aside class="notes">
-A Bayesian model is the combination of the prior and the likelihood.
-</aside>
+A Bayesian model is the combination of a prior and a likelihood.
 
-## Example: Bernoulli and Binomial Likelihoods
+The likelihood characterises the model and gives the probability of the data conditional on the model and choice of parameter.
 
-$$
-p(y|\theta) = \binom{n}{y} \theta^y (1 - \theta)^{n - y}
-$$
+The prior is specifies what we know about the model parameter before considering the data.
 
-<aside class="notes">
-With more complicated models it is seldom possible to write an analytical expression for the posterior.
-</aside>
+The denominator is sometimes called the "Evidence". It's just the marginal distribution of $y$.
 
-## So much for Theory...
+It's also taken a while for these techniques to take off because they are computationally challenging. Hardware advances have made them eminently feasible.
 
-Analytical expressions are rare in practice.
+So much for theory. Analytical expressions are rare in practice.
 
 Confounding features:
 
 - data are often multi-dimensional;
 - models have multiple parameters.
 
-So evaluating $p(\theta|y)$ becomes challenging!
+So evaluating $p(\theta|y, X)$ becomes challenging!
+</aside>
 
-## Grid Approximation
+---
 
-```{r}
+<blockquote>
+... the theory of inverse probability is founded upon error and must be wholly rejected.
+<cite>Sir Ronald Fisher (1925)</cite>
+</blockquote>
+
+<aside class="notes">
+Historically the Bayesian approach has been marginalised by some eminent statisticians. For example, Ronald Fisher had this to say about inverse probability as Bayesian inference was known in his day. Evidently not everybody is a fan.
+
+In general you can't apply Bayesian techniques analytically.
+</aside>
+
+---
+
+```{r include=FALSE}
 prior <- tibble(
   theta = seq(0, 1, 0.02),
   update = 0
@@ -282,8 +375,8 @@ prior <- tibble(
 prior_unif <- prior %>% mutate(
   p = 1
 )
-prior_trig <- prior %>% mutate(
-  p = ifelse(theta < 0.5, 2 * theta, 2 - 2 * theta)
+prior_beta <- prior %>% mutate(
+  p = dbeta(theta, 8, 4)
 )
 
 binom_update <- function(prior, k, n) {
@@ -300,54 +393,49 @@ binom_update <- function(prior, k, n) {
 plot(p ~ theta, prior_unif)
 plot(p ~ theta, binom_update(prior_unif, 1, 3))
 
-plot(p ~ theta, prior_trig)
-plot(p ~ theta, binom_update(prior_trig, 1, 3))
+plot(p ~ theta, prior_beta)
+plot(p ~ theta, binom_update(prior_beta, 1, 3))
+```
+
+```{r echo=FALSE}
+for (n in 1:11) {
+  hits = sessions[[n, "hits"]]
+  spins = sessions[[n, "spins"]]
+  prior_unif <- rbind(prior_unif, binom_update(prior_unif %>% filter(update == n - 1), hits, spins) %>% mutate(update = update + 1))
+  prior_beta <- rbind(prior_beta, binom_update(prior_beta %>% filter(update == n - 1), hits, spins) %>% mutate(update = update + 1))
+}
+
+prior_unif$prior = "Uniform"
+prior_beta$prior = "Beta"
+#
+priors = rbind(prior_unif, prior_beta)
+
+ggplot(prior_unif, aes(x = theta, y = p)) +
+  geom_line() +
+  geom_point(size = 1) +
+  facet_wrap(~ update, scales = "free_y")
 ```
 
 <aside class="notes">
+One approach to applying Bayes' Theorem is to evaluate the posterior across a regular grid. Not surprisingly this is known as the "Grid Approximation".
+
 In the grid approximation we consider a finite number of points at which we evaluate the prior and likelihood. Their product then gives us the posterior at each of those points.
 
 There's a major problem with the grid approximation: it scales poorly with the number of parameters in the model and rapidly becomes computationally intractable.
 </aside>
 
-## foo
+---
 
-```{r}
-for (n in 1:11) {
-  hits = sessions[[n, "hits"]]
-  spins = sessions[[n, "spins"]]
-  prior_unif <- rbind(prior_unif, binom_update(prior_unif %>% filter(update == n - 1), hits, spins) %>% mutate(update = update + 1))
-  prior_trig <- rbind(prior_trig, binom_update(prior_trig %>% filter(update == n - 1), hits, spins) %>% mutate(update = update + 1))
-}
-
-prior_unif$prior = "Uniform"
-prior_trig$prior = "Triangle"
-#
-priors = rbind(prior_unif, prior_trig)
-```
-
-## foo
-
-```{r}
-ggplot(prior_unif, aes(x = theta, y = p)) +
+```{r echo=FALSE}
+ggplot(prior_beta, aes(x = theta, y = p)) +
   geom_line() +
-  geom_point() +
+  geom_point(size = 2) +
   facet_wrap(~ update, scales = "free_y")
 ```
 
-## foo
+---
 
-```{r}
-
-ggplot(prior_trig, aes(x = theta, y = p)) +
-  geom_line() +
-  geom_point() +
-  facet_wrap(~ update, scales = "free_y")
-```
-
-## foo
-
-```{r}
+```{r echo=FALSE}
 
 ggplot(priors, aes(x = theta, y = p)) +
   geom_line(aes(col = prior)) +
@@ -359,23 +447,143 @@ ggplot(priors, aes(x = theta, y = p)) +
 
 Metropolis-Hastings algorithm.
 
-## More Efficient Simulation!
+CAN WE GET A GIF FOR THIS?
+
+<aside class="notes">
+Draw samples from the posterior and use them to estimate quantities (like mean of parameter).
+
+We can make this as accurate as required by generating more samples.
+
+The only challenge is sampling from the posterior!
+</aside>
+
+## Vanilla Monte Carlo
+
+Generate a whole bunch of independent $\theta^{(i)}$.
+
+To do this we need to have
+
+$$
+p(\theta^{(m)} | y)
+$$
+
+<aside class="notes">
+To apply Monte Carlo to a general probability distribution we'd need to apply something like importance sampling. To make this efficient we'd need to know the maximum of the distribution. This would be a significant computational burden.
+
+Fortunately there is an alternative which is very efficient.
+</aside>
+
+## Markov Chain Monte Carlo (MCMC)
+
+Generate $\theta^1$, $\theta^2$, $\theta^3$, ... $\theta^M$ where $\theta^m$ depends on $\theta^{m-1}$
+
+To do this we need to have
+
+$$
+p(\theta^{m} | \theta^{m-1}, y)
+$$
+
+<aside class="notes">
+We don't actually evaluate this probability explicitly. Instead we use some slight of hand.
+</aside>
+
+## Simplified Metropolis Algorithm
+
+1. Randomly sample $\theta^{(1)}$.
+2. Set $i = 2$.
+3. Randomly sample proposal $\theta^{*}$ in the vicinity of $\theta^{i-1}$.
+4. Sample $u$ uniformly on $[0, 1)$.
+5. 
+
+$$
+\theta^{(i)} = \left\{\begin{array}{ll}
+\theta^{*} & \text{if } u \cdot p(\theta^{i-1}|y, X) < p(\theta^{*}|y, X) \\
+\theta^{(i-1)} & \text{otherwise.}
+\end{array}\right.
+$$
+
+<aside class="notes">
+So, the aim of this algorithm is to jump around in parameter space, but in a way that the probability to be at a point is proportional to the function we sample from (this is usually called the target function). In our case this is the posterior defined above.
+
+The principle advantage of MCMC is that we don't need to know the maximum value of the posterior.
+
+Also it only depends on the ratio of posteriors, so these do not need to be normalised.
+
+It might occur to you that the samples are now no longer independent. And you'd be completely correct. We'll see how this is accounted for.
+</aside>
+
+---
+
+```{r echo=FALSE}
+N = 4000
+
+proposal <- function(theta) {
+  rnorm(1, theta)
+}
+
+posterior <- function(theta) {
+  dbeta(theta, 7, 4)
+}
+
+chain <- vector(mode = "numeric", length = N)
+chain[1] = 0.5
+#
+for (n in 2:N) {
+  star = proposal(chain[n-1])
+  u = runif(1)
+  #
+  if (u < posterior(star) / posterior(chain[n-1])) {
+    chain[n] = star
+  } else {
+    chain[n] = chain[n-1]
+  }
+}
+
+chain = data.frame(
+  n = 1:N,
+  theta = chain
+) %>% mutate(
+  batch = (n - 1) %/% 1000 
+)
+
+# ggplot(chain, aes(x = theta)) +
+#   geom_histogram() +
+#   facet_wrap(~ batch)
+
+ggplot(chain, aes(x = n, y = theta)) +
+  geom_line() +
+  scale_y_continuous(limits = c(0, 1))
+```
+
+<aside class="notes">
+This is an example of a *traceplot*. You can see where the proposals are being rejected. Ideally we are aiming for good "mixing" across the domain of the distribution.
+
+It might occur to you that the samples are now no longer independent. And you'd be completely correct. We'll see how this is accounted for.
+
+Metropolis sampling is rather inefficient. Stan actually uses Hamiltonian Monte Carlo. The underlying principles are essentially the same, but this technique samples the parameter space much more efficiently.
 
 Hamiltonian Monte Carlo.
 
 The NUTS sampling algorithm is *much* more efficient than vanilla MCMC.
 
 Treat the parameter vector like the coordinates of a particle on a potential energy surface, where the potential energy is the negative log posterior.
+</aside>
+
+---
+
+<img src="https://cdn.rawgit.com/stan-dev/logos/0f0922d5/logo_name_banner.svg" />
+
+<aside class="notes">
+Stan is a high level language for writing statistical models.
+</aside>
 
 ## Stan Skeleton
 
 <script src="https://gist.github.com/DataWookie/61d7a662ecaad87044e1c9f161a5245f.js"></script>
 
-## Image
-
-<img src="https://cdn.rawgit.com/stan-dev/logos/0f0922d5/logo_name_banner.svg" />
-
-High level language for writing statistical models.
+<aside class="notes">
+The data block defines variables that have a source outside of Stan.
+</aside>
 
 ## Bare Bones Stan
 
@@ -390,17 +598,11 @@ Stan workflow:
 - Compile C++.
 - Execute compiled binary.
 
-Requirements:
+Using Stan with R:
 
-- `.R` file
-- `.stan` file
-
-Using `rstan`:
-
-- RStudio recognises `.stan` files.
-- Steps automated.
-
-
+- A `.R` file.
+- A `.stan` file.
+- Stan workflow automated through R.
 
 <aside class="notes">
 1. Represent a statistical model by writing its log posterior density (up to
@@ -436,7 +638,7 @@ stan function.
 ## Stan 1 .stan
 
 ```{r echo=FALSE, cache=FALSE}
-read_chunk("sessions-binomial-no-prior.stan")
+read_chunk("binomial-no-prior.stan")
 ```
 
 ```{text stan_binomial_no_prior, message=FALSE, warning=FALSE, eval=FALSE}
@@ -468,7 +670,7 @@ trials <- list(
 )
 
 fit <- stan(
-  file    = "sessions-binomial-no-prior.stan",
+  file    = "binomial-no-prior.stan",
   data    = trials,
   chains  = 4,                         # Number of Markov chains
   warmup  = 1000,                      # Number of warmup iterations per chain
@@ -488,7 +690,7 @@ fit
 ```
 
 <aside class="notes">
-`n_eff` is the effective number of samples.
+`n_eff` is the effective number of samples. This takes into account that the samples are not really independent (this is a consequence of correlation in the Markov Chain).
 </aside>
 
 # Stan 1a
@@ -503,7 +705,7 @@ trials <- list(
 )
 
 fit <- stan(
-  file    = "sessions-binomial-uniform-prior.stan",
+  file    = "binomial-uniform-prior.stan",
   data    = trials,
   chains  = 4,
   warmup  = 1000,
@@ -524,7 +726,7 @@ trials <- list(
 )
 
 fit <- stan(
-  file    = "sessions-binomial-beta-prior.stan",
+  file    = "binomial-beta-prior.stan",
   data    = trials,
   chains  = 4,
   warmup  = 1000,
@@ -532,6 +734,10 @@ fit <- stan(
   refresh = 1000
 )
 ```
+
+<aside class="notes">
+The beta distribution is the conjugate prior for the binomial likelihood (this means that the corresponding posterior will also be a beta distribution).
+</aside>
 
 ## Stan 2
 
@@ -576,7 +782,7 @@ trials <- list(
 )
 
 fit <- stan(
-  file    = "sessions-poisson.stan",
+  file    = "poisson.stan",
   data    = trials,
   chains  = 4,
   warmup  = 1000,
@@ -606,7 +812,7 @@ ggplot(sessions, aes(x = payout / wager)) + geom_histogram()
 ## Stan 5
 
 ```{r echo=FALSE, cache=FALSE}
-read_chunk("sessions-normal.stan")
+read_chunk("normal.stan")
 ```
 
 ```{text stan_normal, message=FALSE, warning=FALSE, eval=FALSE}
@@ -626,7 +832,7 @@ trials <- list(
 )
 
 fit <- stan(
-  file    = "sessions-normal.stan",
+  file    = "normal.stan",
   data    = trials,
   chains  = 4,
   warmup  = 1000,
@@ -650,7 +856,7 @@ ggplot(sessions, aes(spins, wager)) + geom_jitter()
 ## Regression Stan
 
 ```{r echo=FALSE, cache=FALSE}
-read_chunk("sessions-regression.stan")
+read_chunk("regression.stan")
 ```
 
 ```{text stan_regression, message=FALSE, warning=FALSE, eval=FALSE}
@@ -661,14 +867,14 @@ read_chunk("sessions-regression.stan")
 ```{r cache=TRUE}
 trials <- list(
   N       = nrow(sessions),
-  x       = sessions$spins,
+  x       = scale(sessions$spins),     # Standardised covariate
   y       = sessions$wager
 )
 
 options(mc.cores = parallel::detectCores())
 
 fit <- stan(
-  file    = "sessions-regression.stan",
+  file    = "regression.stan",
   data    = trials,
   chains  = 4,
   warmup  = 1000,
@@ -676,6 +882,12 @@ fit <- stan(
   refresh = 1000
 )
 ```
+
+<aside class="notes">
+In a linear model we are saying that the response is normally distributed with a mean that depends on the covariates and a constant standard deviation. Assuming homogeneous noise.
+
+The half-Cauchy is essentially a one-sided, heavy tailed version of the Normal distribution. This constrains the value of sigma to be positive but is not as restrictive as a Normal distribution.
+</aside>
 
 ## Predictive Inference
 
@@ -691,6 +903,16 @@ What is the distribution of the hit rate?
 
 (Spoiler: It's not Normal.)
 
+## Posterior Predictive Distribution
+
+$$
+p(\tilde{y}|y) = \int_\theta p(\tilde{y}|\theta) p(\theta|y) d\theta
+$$
+
+## Something
+
+Generate some derived quantity from the posterior (because we can evaluate any function of the parameters...)
+
 ## ShinyStan
 
 library(shinystan)
@@ -698,6 +920,14 @@ launch_shinystan(fit)
 #
 # Diagnose -> PPcheck "Posterior predictive check" (look at distribution of observed data versus replications - do they look similar? "If our model is a good fit then we should be able to use it to generate data that looks a lot like the data we observed.")
 
+## What is Bayes Good For?
+
+- Models where we care about parameter values.
+
+
+<aside class="notes">
+So these are not black box Machine Learning models where we simply want to make the best possible predictions. Here we actually care what's going on inside the box.
+</aside>
 
 ## Resources
 
