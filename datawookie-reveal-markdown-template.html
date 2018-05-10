@@ -16,7 +16,7 @@ $endif$
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
-  <link rel="stylesheet" href="$revealjs-url$/css/reveal.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.6.0/css/reveal.css"/>
   <link href="https://use.fontawesome.com/releases/v5.0.7/css/all.css" rel="stylesheet">
 
 $if(highlightjs)$
@@ -33,7 +33,7 @@ $highlighting-css$
 $endif$
 
 $if(theme)$
-<link rel="stylesheet" href="$revealjs-url$/css/theme/$theme$.css" id="theme">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.6.0/css/theme/$theme$.css" id="theme">
 $endif$
 
 $if(theme-dark)$
@@ -524,10 +524,11 @@ $endif$
 $if(date)$
     <h3 class="date">$date$</h3>
 $endif$
-$if(title_logo)$
-$for(title_logo)$
-    <img src="$title_logo$" class="logo" height="80px">
-$endfor$
+$if(title_logo_toptal)$
+<img src="https://rawgit.com/DataWookie/datawookie/master/static/img/logo/logo-toptal.png" class="logo" height="80px">
+$endif$
+$if(title_logo_exegetic)$
+<img src="https://rawgit.com/DataWookie/www-exegetic-biz/master/static/img/logo-exegetic-black.svg" class="logo" height="80px">
 $endif$
 </section>
 $endif$
@@ -541,8 +542,8 @@ $body$
     </div>
   </div>
 
-  <script src="$revealjs-url$/lib/js/head.min.js"></script>
-  <script src="$revealjs-url$/js/reveal.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.6.0/lib/js/head.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.6.0/js/reveal.js"></script>
 
   <script>
 
@@ -752,19 +753,19 @@ $endif$
         // Optional reveal.js plugins
         dependencies: [
 $if(plugin-notes)$
-          { src: '$revealjs-url$/plugin/notes/notes.js', async: true },
+          { src: 'https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.6.0/plugin/notes/notes.js', async: true },
 $endif$
 $if(plugin-search)$
-          { src: '$revealjs-url$/plugin/search/search.js', async: true },
+          { src: 'https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.6.0/plugin/search/search.js', async: true },
 $endif$
 $if(plugin-zoom)$
-          { src: '$revealjs-url$/plugin/zoom-js/zoom.js', async: true },
+          { src: 'https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.6.0/plugin/zoom-js/zoom.js', async: true },
 $endif$
 $if(plugin-chalkboard)$
-          { src: '$revealjs-url$/plugin/chalkboard/chalkboard.js', async: true },
+          { src: 'https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.6.0/plugin/chalkboard/chalkboard.js', async: true },
 $endif$
 $if(plugin-menu)$
-          { src: '$revealjs-url$/plugin/menu/menu.js', async: true },
+          { src: 'https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.6.0/plugin/menu/menu.js', async: true },
 $endif$
         ]
       });
