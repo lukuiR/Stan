@@ -1,3 +1,7 @@
+body > div > .slides {
+  width: 70% !important;
+}
+
 h2, p {
   text-align: left;
 }
@@ -7,7 +11,7 @@ h2, p {
 }
 #title-page .subtitle {
   font-size: 1.25em;
-  color: grey;
+  color: #464646;
 }
 #title-page .author {
   text-align: center;
@@ -16,7 +20,7 @@ h2, p {
 }
 #title-page .author-info {
   text-align: center;
-  font-size: 0.75em;
+  font-size: 0.625em;
   margin-bottom: 10px;
 }
 #title-page .location {
@@ -26,7 +30,7 @@ h2, p {
 }
 #title-page .date {
   font-size: 0.75em;
-  color: grey;
+  color: #464646;
 }
 #title-page .logo {
   margin-left: 20px;
@@ -36,6 +40,7 @@ h2, p {
 .reveal section img {
   border: none;
   box-shadow: none;
+  margin: 0px;
 }
 
 .reveal pre {
@@ -43,6 +48,10 @@ h2, p {
   width: 100%;
 }
 .reveal pre > code {
+  background-color: transparent;
+  max-height: none;
+}
+.reveal pre > .sourceCode {
   background-color: rgba(52, 152, 219, 0.25);
 }
 
@@ -62,4 +71,52 @@ h2, p {
   text-align: right;
   z-index:-10;
   width:50%;
+}
+
+/* CODE -------------------------------------------------------------------- */
+
+p code,
+ul > li > code {
+	color: #c7254e;
+    background-color: white;
+}
+
+/* LISTS ------------------------------------------------------------------- */
+
+.reveal ul, .reveal ol {
+  display: block;
+}
+
+/* BLOCKQUOTE -------------------------------------------------------------- */
+
+.reveal blockquote {
+	background-color: rgba(56, 99, 160, 0.1);
+	border-style: dashed;
+	border-width: 1px;
+	width: auto;
+	padding-left: 5%;
+	padding-right: 5%;
+	text-align: left;
+}
+
+.reveal blockquote p:first-child,
+.reveal blockquote p:last-child {
+     display: block; 
+}
+
+.reveal blockquote p {
+	margin-top: 5px;
+	margin-bottom: 5px;
+}
+
+.reveal blockquote p:first-child {
+	margin-top: 10px;
+}
+
+.reveal blockquote p:last-child {
+	margin-bottom: 10px;
+}
+
+.reveal blockquote > cite {
+  font-style: normal;
 }
