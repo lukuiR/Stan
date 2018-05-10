@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
-  <link rel="stylesheet" href="bayesian-leap_files/reveal.js-3.3.0.1/css/reveal.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.6.0/css/reveal.css"/>
   <link href="https://use.fontawesome.com/releases/v5.0.7/css/all.css" rel="stylesheet">
 
 
@@ -51,7 +51,7 @@ code > span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* Com
 code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
 </style>
 
-<link rel="stylesheet" href="bayesian-leap_files/reveal.js-3.3.0.1/css/theme/simple.css" id="theme">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.6.0/css/theme/simple.css" id="theme">
 
 
   <!-- some tweaks to reveal css -->
@@ -517,8 +517,8 @@ To be honest, Maud is generally rather obsessive. As you’ll see, this will wor
 <p>Somewhat surprisingly, Maud is also a big fan of R.</p>
 It’s been really, um interesting, to have her as a collaborator.
 </aside>
-</section><section id="data-by-session" class="slide level2">
-<h2>Data (by Session)</h2>
+</section><section id="mauds-data-by-session" class="slide level2">
+<h2>Maud’s Data (by Session)</h2>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">sessions <span class="op">%&gt;%</span><span class="st"> </span><span class="kw">select</span>(<span class="op">-</span>details)</code></pre></div>
 <pre><code># A tibble: 100 x 7
    session spins  hits wager payout  hit_rate       rtp
@@ -537,8 +537,8 @@ It’s been really, um interesting, to have her as a collaborator.
 <aside class="notes">
 Maud obsessively records her gambling stats. As a result we have a rather nice, rich data set to play with. At the session level the most important bits of information are the number of spins and the associated number of hits. It might occur to you that the relationship between these two quantities could be modelled as a binomial process.
 </aside>
-</section><section id="data-by-spin" class="slide level2">
-<h2>Data (by Spin)</h2>
+</section><section id="mauds-data-by-spin" class="slide level2">
+<h2>Maud’s Data (by Spin)</h2>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">sessions <span class="op">%&gt;%</span><span class="st"> </span><span class="kw">select</span>(session, details) <span class="op">%&gt;%</span><span class="st"> </span><span class="kw">unnest</span>()</code></pre></div>
 <pre><code># A tibble: 1,972 x 4
    session  spin wager payout
@@ -557,13 +557,16 @@ Maud obsessively records her gambling stats. As a result we have a rather nice, 
 <aside class="notes">
 We can also unpack these data down to the level of individual spins, where we have something that could be modelled as a Bernoulli process.
 </aside>
-</section><section id="mauds-burning-questions" class="slide level2">
+</section><section id="mauds-burning-questions" class="slide level2 center">
 <h2>Maud’s Burning Questions</h2>
 <ul>
-<li>What is the distribution of the hit rate? (Spoiler: It’s not Normal.)</li>
 <li>What is the RTP?</li>
-<li>What is the probability of each payline?</li>
+<li>What is the hit rate?</li>
+<li>What is the hit rate for each payline?</li>
 </ul>
+<aside class="notes">
+If she could get her hands on the uncertainties in these estimates, that would be an added bonus.
+</aside>
 </section></section>
 <section><section id="binomial-process" class="titleslide slide level1"><h1>Binomial Process</h1></section><section id="section-3" class="slide level2 center">
 <h2></h2>
@@ -766,12 +769,20 @@ It might occur to you that the samples are now no longer independent. And you’
 </aside>
 </section><section class="slide level2">
 
-</section></section>
-<section><section id="ggplotchain-aesx-theta" class="titleslide slide level1"><h1>ggplot(chain, aes(x = theta)) +</h1></section></section>
-<section><section id="geom_histogram" class="titleslide slide level1"><h1>geom_histogram() +</h1></section></section>
-<section><section id="facet_wrap-batch" class="titleslide slide level1"><h1>facet_wrap(~ batch)</h1></section><section id="section-8" class="slide level2 center">
+<p><img src="bayesian-leap_files/figure-revealjs/manual_traceplot-1.png" width="960" /></p>
+<aside class="notes">
+<p>This is an example of a <em>traceplot</em>. You can see where the proposals are being rejected. Ideally we are aiming for good “mixing” across the domain of the distribution.</p>
+<p>It might occur to you that the samples are now no longer independent. And you’d be completely correct. We’ll see how this is accounted for.</p>
+<p>Metropolis Monte Carlo is better than the Grid Approximation. However in an absolute sense it’s not really all that good. Especially not in higher dimensions.</p>
+<p>Metropolis sampling is rather inefficient. Stan actually uses Hamiltonian Monte Carlo. The underlying principles are essentially the same, but this technique samples the parameter space much more efficiently.</p>
+<p>Hamiltonian Monte Carlo introduces some coherence into the random walk by using some principles from Physics. Yes, it takes a little longer to generate each sample, but those samples are guaranteed to explore parameter space much more effectively.</p>
+<p>The NUTS sampling algorithm is <em>much</em> more efficient than vanilla MCMC.</p>
+<p>Treat the parameter vector like the coordinates of a particle on a potential energy surface, where the potential energy is the negative log posterior.</p>
+There are more complicated schemes for proposing new locations and the rules for accepting them, but the basic idea is still: (1) pick a new “proposed” location; (2) figure out how much higher or lower that location is compared to your current location; (3) probabilistically stay put or move to that location in a way that respects the overall goal of spending time proportional to height of the location.
+</aside>
+</section><section id="section-8" class="slide level2 center">
 <h2></h2>
-<p><img src="/home/colliera/proj/Z-314-datawookie-site/static/img/logo/logo-stan.svg" /></p>
+<p><img src="https://rawgit.com/DataWookie/datawookie/master/static/img/logo/logo-stan.svg" /></p>
 <aside class="notes">
 Stan is a high level language for writing statistical models.
 </aside>
@@ -975,7 +986,7 @@ Don’t think of a confidence interval. These are quantiles of the density. Clos
 <pre><code>outer_level: 0.95 (95% intervals)</code></pre>
 </section><section id="section-11" class="slide level2">
 <h2><img src="bayesian-leap_files/figure-revealjs/density_binomial-1.png" width="960" /></h2>
-<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">plot</span>(fit, <span class="dt">plotfun =</span> <span class="st">&quot;hist&quot;</span>, <span class="dt">pars =</span> <span class="st">&quot;theta&quot;</span>, <span class="dt">include =</span> <span class="ot">FALSE</span>)</code></pre></div>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">plot</span>(fit, <span class="dt">plotfun =</span> <span class="st">&quot;hist&quot;</span>, <span class="dt">pars =</span> <span class="kw">c</span>(), <span class="dt">include =</span> <span class="ot">FALSE</span>)</code></pre></div>
 <pre><code>`stat_bin()` using `bins = 30`. Pick better value with `binwidth`.</code></pre>
 <p><img src="bayesian-leap_files/figure-revealjs/hist_binomial-1.png" width="960" /></p>
 </section><section id="section-12" class="slide level2 center">
@@ -1014,6 +1025,10 @@ and Rhat is the potential scale reduction factor on split chains (at
 convergence, Rhat=1).</code></pre>
 <p>This suggests that the RTP is around 76.8.</p>
 <p>But this treats the distribution as Normal. Is this a good model?</p>
+<aside class="notes">
+<p>It’s probably not a terribly good model because confidence intervals will extend below zero and this is not physically realisable.</p>
+We can do better!
+</aside>
 </section><section id="section-15" class="slide level2 center">
 <h2></h2>
 <p><img src="bayesian-leap_files/figure-revealjs/pairs_rtp-1.png" width="960" /></p>
@@ -1022,9 +1037,104 @@ convergence, Rhat=1).</code></pre>
 </section><section id="posterior-predictive-check" class="slide level2">
 <h2>Posterior Predictive Check</h2>
 <p>THIS SHOULD SHOW THAT THERE ARE PROBLEMS WITH THE MODEL</p>
-</section><section id="pay-table" class="slide level2">
-<h2>Pay Table</h2>
-<p>PUT IN A TABLE WITH paytable$payout</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">posterior_samples &lt;-<span class="st"> </span><span class="kw">as.data.frame</span>(fit)
+
+<span class="kw">ggplot</span>(posterior_samples, <span class="kw">aes</span>(<span class="dt">x =</span> mu))</code></pre></div>
+<p><img src="bayesian-leap_files/figure-revealjs/unnamed-chunk-28-1.png" width="960" /></p>
+</section><section id="section-16" class="slide level2 center">
+<h2></h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left;">
+description
+</th>
+<th style="text-align:left;">
+symbols
+</th>
+<th style="text-align:right;">
+payout
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+</td>
+<td style="text-align:left;">
+</td>
+<td style="text-align:right;">
+0
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1x mouse
+</td>
+<td style="text-align:left;">
+🐭
+</td>
+<td style="text-align:right;">
+1
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+1x cat
+</td>
+<td style="text-align:left;">
+🐱
+</td>
+<td style="text-align:right;">
+2
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2x mouse
+</td>
+<td style="text-align:left;">
+🐭🐭
+</td>
+<td style="text-align:right;">
+5
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2x cat
+</td>
+<td style="text-align:left;">
+🐱🐱
+</td>
+<td style="text-align:right;">
+10
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+3x mouse
+</td>
+<td style="text-align:left;">
+🐭🐭🐭
+</td>
+<td style="text-align:right;">
+20
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+3x cat
+</td>
+<td style="text-align:left;">
+🐱🐱🐱
+</td>
+<td style="text-align:right;">
+100
+</td>
+</tr>
+</tbody>
+</table>
 </section><section class="slide level2">
 
 <pre class="text"><code>data {
@@ -1183,8 +1293,8 @@ The half-Cauchy is essentially a one-sided, heavy tailed version of the Normal d
     </div>
   </div>
 
-  <script src="bayesian-leap_files/reveal.js-3.3.0.1/lib/js/head.min.js"></script>
-  <script src="bayesian-leap_files/reveal.js-3.3.0.1/js/reveal.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.6.0/lib/js/head.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.6.0/js/reveal.js"></script>
 
   <script>
 
@@ -1205,7 +1315,7 @@ The half-Cauchy is essentially a one-sided, heavy tailed version of the Normal d
 
         // Optional reveal.js plugins
         dependencies: [
-          { src: 'bayesian-leap_files/reveal.js-3.3.0.1/plugin/notes/notes.js', async: true },
+          { src: 'https://cdnjs.cloudflare.com/ajax/libs/reveal.js/3.6.0/plugin/notes/notes.js', async: true },
         ]
       });
     </script>
