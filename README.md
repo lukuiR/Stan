@@ -1,0 +1,1 @@
+The talk slides are available [here](https://datawookie.github.io/talk-bayesian-leap/bayesian-leap.html).
