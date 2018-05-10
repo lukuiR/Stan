@@ -1,8 +1,8 @@
 ## @knitr stan_regression
 data {
   int<lower=0> N;
-  vector[N] y;
-  vector[N] x;
+  vector[N] y;                         // Total wager
+  vector[N] x;                         // Number of spins (standardised)
 }
 parameters {
   real alpha;

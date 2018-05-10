@@ -1,5 +1,5 @@
 ---
-title: "Taking the Bayesian Leap"
+title: First Steps with Stan
 subtitle: "Maud goes to Vegas"
 author: Andrew B. Collier
 location: eRum (Budapest)
@@ -28,16 +28,23 @@ editor_options:
     - https://vimeo.com/132156595
     - https://www.youtube.com/watch?v=qQFF4tPgeWI [Bob Carpenter. Background information. No demo of Stan.]
     - https://www.youtube.com/watch?v=uSjsJg8fcwY [Michael Betancourt - "Some Bayesian Modeling Techniques in Stan". Mostly linear models.]
+    - https://www.youtube.com/watch?v=pHsuIaPbNbY [Michael Betancourt - "Efficient Bayesian inference with Hamiltonian Monte Carlo". Great background on MC.]
 
     - http://m-clark.github.io/docs/IntroBayes.html
-    - https://www.youtube.com/watch?v=pHsuIaPbNbY [Michael Betancourt - "Efficient Bayesian inference with Hamiltonian Monte Carlo"]
     
     - https://matthewdharris.com/2016/10/18/estimating-a-beta-distribution-with-stan-hmc/
     - http://blackwell.math.yorku.ca/MATH6635/2016/Day17/MCMC_with_STAN_examples.html
+    - https://stats.stackexchange.com/questions/165/how-would-you-explain-markov-chain-monte-carlo-mcmc-to-a-layperson
+    - http://mlwhiz.com/blog/2015/08/19/MCMC_Algorithms_Beta_Distribution/
+    - http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.13.7133&rep=rep1&type=pdf
+    - https://jeremykun.com/2015/04/06/markov-chain-monte-carlo-without-all-the-bullshit/
+    - https://link.springer.com/article/10.3758%2Fs13423-016-1015-8
 -->
 
 ```{r setup, include=FALSE, warning=FALSE, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, comment = NA, fig.width = 7.5)
+
+options(width = 120)
 
 library(dplyr)
 library(tidyr)
@@ -45,16 +52,22 @@ library(rstan)
 library(ggplot2)
 library(icon)
 library(knitr)
+
+# Plotting options for RStan.
+#
+rstan_gg_options(fill = "skyblue", color = "skyblue4", pt_color = "red")
 ```
 
 <aside class="notes">
+I'm Andrew Collier and I'm a Freelance Data Scientist at Toptal, which is a talent network for technical specialists. If anybody is interested in finding out more about Toptal, I'd be happy to chat afterwards.
+
 Enough about me. I want you to meet somebody else.
 
 Meet my friend Maud.
 
-Maud is 71. She likes cats and gardening. SOMETHING ELSE.
+Maud is 71. She likes cats and gardening.
 
-Maud has a gambling problem.
+She also has a gambling problem.
 </aside>
 
 ## {data-background="img/slot-machine.jpg"}
@@ -72,10 +85,18 @@ paytable <- data.frame(
 ) %>% select(frequency, payout, symbols)
 ```
 
+<aside class="notes">
+Her weakness is slot machines. She's positively obsessed by them.
+
+To be honest, Maud is generally rather obsessive. As you'll see, this will work in our favour.
+</aside>
+
 ## {data-background="img/maud-love-r.svg" data-background-size="50%" data-background-position="left bottom"}
 
 <aside class="notes">
-It's been really useful to have Maud as a collaborator.
+Somewhat surprisingly, Maud is also a big fan of R.
+
+It's been really, um interesting, to have her as a collaborator.
 </aside>
 
 ## Data (by Session)
@@ -130,42 +151,25 @@ sessions <- inner_join(
 sessions %>% select(-details)
 ```
 
+<aside class="notes">
+Maud obsessively records her gambling stats. As a result we have a rather nice, rich data set to play with. At the session level the most important bits of information are the number of spins and the associated number of hits. It might occur to you that the relationship between these two quantities could be modelled as a binomial process.
+</aside>
+
 ## Data (by Spin)
 
 ```{r}
 sessions %>% select(session, details) %>% unnest()
 ```
 
-# Binomial Process
-
----
-
-A binomial distribution describes the probability of
-
-- $k$ successes in $n$ trials where
-- the probability of success on any trial is $\theta$.
-
-Probability distribution for binomial process (single trial):
-
-$$
-P(k | n, \theta) = \binom{n}{k} \theta^k (1 - \theta)^{n - k}
-$$
-
 <aside class="notes">
-This is useful if you know $\theta$ and the number of trials and you want to calculate the probability of a given number of successes. But what if you want to go the other way: you've observed $k$ successes from $n$ trials and you want to estimate $\theta$?
+We can also unpack these data down to the level of individual spins, where we have something that could be modelled as a Bernoulli process.
 </aside>
 
----
+# Binomial Process
 
-Simple estimate of probability of success:
+## {.center}
 
-$$
-\text{hit rate} = \theta^* = \frac{\text{hits}}{\text{spins}}
-$$
-
----
-
-Probability distribution for binomial process (single trial):
+Probability distribution for binomial process:
 
 $$
 P(k | n, \theta) = \binom{n}{k} \theta^k (1 - \theta)^{n - k}
@@ -176,17 +180,37 @@ where
 - $k$ successes in $n$ trials where
 - the probability of success on any trial is $\theta$.
 
----
+<aside class="notes">
+We're going to focus on the session level data for the moment. For each session we are considering the number of spins (or "trials") denoted by $n$ and the number of hits (or "successes") denoted by $k$. The probability of success on any spin is $\theta$.
 
-### One Massive Binomial Experiment
+The binomial distribution allows us to calculate the probability of $k$ given specific values for $n$ and $\theta$. So this assumes that you know $\theta$... But what if you don't? Certainly for most slot machines you don't know the probability of winning. If you did then you probably wouldn't be very tempted to play.
+
+Suppose we had observations of $k$ and $n$, and wanted to estimate $\theta$.
+</aside>
+
+## {.center}
+
+$$
+\text{hit rate} = \theta^* = \frac{\text{hits}}{\text{spins}}
+$$
+
+<aside class="notes">
+Well, the hit rate, $\theta$, is just the expected number of hits per spin.
+</aside>
+
+## {.center}
 
 ```{r}
 with(sessions, sum(hits) / sum(spins))
 ```
 
----
+<aside class="notes">
+So we could lump all of the data together and treat it as a single massive binomial experiment, taking the ratio of the total number of hits to the total number of spins across all sessions.
 
-### Series of Binomial Experiments
+This would certainly maximise the amount of data and should, in principle, give us a reasonably accurate result. But there is no way to quantify our uncertainty. Such a paucity of information leads to overconfidence in the quality of the estimate.
+</aside>
+
+## {.center}
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=3}
 ggplot(sessions, aes(x = hit_rate)) +
@@ -194,29 +218,32 @@ ggplot(sessions, aes(x = hit_rate)) +
   scale_x_continuous("Hit Rate", limits = c(0, 1), labels = scales::percent) +
   scale_y_continuous("Count") +
   theme_classic()
-```
 
-```{r}
-sessions %>% summarise(
+session_summary <- sessions %>% summarise(
   session_avg = mean(hit_rate),
   session_std = sd(hit_rate)
+) %>% mutate(
+  ci_lower = session_avg - 2 * session_std / sqrt(SESSIONS),
+  ci_upper = session_avg + 2 * session_std / sqrt(SESSIONS)
 )
 ```
 
-<aside class="notes">
-The simplest way to calculate the hit rate is to simply take the ratio of the total number of hits to the total number of spins across all sessions. The problem with this is that it gives no indication of uncertainty.
+```{r echo=FALSE}
+session_summary %>% select(session_avg, session_std)
+```
 
-Another approach is to calculate statistics per session. Now you can calculate the average and spread. However, there are two problems with this:
+Confidence interval (95%) extends from `r format(session_summary$ci_lower * 100, digits = 3)`% to  `r format(session_summary$ci_upper * 100, digits = 3)`%.
+
+<aside class="notes">
+Another approach is to treat each session as an independent binomial experiment, each of which yields an estimate for the hit rate.
+
+Now you can calculate the average and spread. However, there are two problems with this:
 
 1. it ignores the number of spins per session (this could be incorporated by using weighted statistics) and
 2. it assumes that the hit rate is Normally distributed (and it's not!).
+
+Maud is fairly happy with this result, but it does concern her that the confidence interval on the hit rate could, in principle, extend to values less than zero or greater than one. Neither of which is physically possible. There are no constraints on $\theta$.
 </aside>
-
----
-
-What if we have data for multiple sessions?
-
-For session $i$ there were $k_i$ hits from $n_i$ spins.
 
 ---
 
@@ -241,6 +268,8 @@ binom_probability <- function(theta, k, n) {
 }
 ```
 
+For session $i$ there were $k_i$ hits from $n_i$ spins.
+
 Assuming that sessions are independent:
 
 $$
@@ -248,6 +277,12 @@ P(k | n, \theta) = \prod_i P(k_i | n_i, \theta) = L(\theta; n, k)
 $$
 
 <aside class="notes">
+Let's consider what the probability distribution looks like for all of the sessions lumped together. If we assume that they are independent, which is a reasonable assumption, then we can simply multiply together the probability distributions for each session. This gives us, one the one hand, a distribution for the number of hits in each of the sessions. But if we think of this as a function of $\theta$ then this gives the likelihood of a particular value of $\theta$ given observed values of $k_i$ and $n_i$.
+
+If we maximise this function then we have the most likely value of $\theta$ based on all of the data.
+
+**Note:**
+
 $P(k | n, \theta)$ and $L(\theta; n, k)$ are functionally equivalent but
 
 - $P(k | n, \theta)$ is a function of $k$ (and is a probability distribution) and
@@ -298,8 +333,10 @@ parameters <- tibble(theta = seq(0, 1, 0.02)) %>%
   )
 ```
 
-```{r echo=FALSE}
-ggplot(parameters, aes(theta, log_likelihood)) + geom_point()
+```{r echo=FALSE, fig.height=3.5}
+ggplot(parameters, aes(theta, log_likelihood)) +
+  geom_point() +
+  scale_y_continuous("Log likelihood")
 ```
 
 ```{r}
@@ -311,9 +348,7 @@ In the Maximum Likelihood approach we simply select the value of the parameter w
 
 The assumption implicit in this approach is that in the absence of data all parameter values are equally probable.
 
-This gives us a point estimate for the parameter. There is no indication of uncertainty. Such a paucity of information leads to overconfidence in the quality of the estimate.
-
-A confidence interval would be an improvement. An entire distribution would be even better.
+This gives us a point estimate for the parameter. There is no indication of uncertainty. However, the likelihood is a tool which will allow us to get a much better characterisation of the hit rate.
 </aside>
 
 ## Bayesian Inference
@@ -351,7 +386,7 @@ Confounding features:
 So evaluating $p(\theta|y, X)$ becomes challenging!
 </aside>
 
----
+## {.center}
 
 <blockquote>
 ... the theory of inverse probability is founded upon error and must be wholly rejected.
@@ -422,6 +457,8 @@ One approach to applying Bayes' Theorem is to evaluate the posterior across a re
 In the grid approximation we consider a finite number of points at which we evaluate the prior and likelihood. Their product then gives us the posterior at each of those points.
 
 There's a major problem with the grid approximation: it scales poorly with the number of parameters in the model and rapidly becomes computationally intractable.
+
+At each iteration the model effectively learns from the new data. The distribution shifts and becomes narrower. Also note that each iteration uses the results of the previous iteration as a prior.
 </aside>
 
 ---
@@ -446,8 +483,6 @@ ggplot(priors, aes(x = theta, y = p)) +
 ## ... resort to Simulation!
 
 Metropolis-Hastings algorithm.
-
-CAN WE GET A GIF FOR THIS?
 
 <aside class="notes">
 Draw samples from the posterior and use them to estimate quantities (like mean of parameter).
@@ -505,6 +540,12 @@ $$
 <aside class="notes">
 So, the aim of this algorithm is to jump around in parameter space, but in a way that the probability to be at a point is proportional to the function we sample from (this is usually called the target function). In our case this is the posterior defined above.
 
+If the probability of the new point is higher then we always accept. If it's lower then we accept with a probability that is the ratios of the densities.
+
+The size of the "vicinity" (effectively the step size) determines the acceptance rate of new points. If it's too large then few new points will be accepted. If it's too small then the rate of diffusion will be painfully slow.
+
+Without step 5 this would essentially give us diffusion, a random walk. But this step, the Metropolis Acceptance Procedure, ensures that sampling converges to the underlying distribution.
+
 The principle advantage of MCMC is that we don't need to know the maximum value of the posterior.
 
 Also it only depends on the ratio of posteriors, so these do not need to be normalised.
@@ -560,18 +601,22 @@ This is an example of a *traceplot*. You can see where the proposals are being r
 
 It might occur to you that the samples are now no longer independent. And you'd be completely correct. We'll see how this is accounted for.
 
+Metropolis Monte Carlo is better than the Grid Approximation. However in an absolute sense it's not really all that good. Especially not in higher dimensions.
+
 Metropolis sampling is rather inefficient. Stan actually uses Hamiltonian Monte Carlo. The underlying principles are essentially the same, but this technique samples the parameter space much more efficiently.
 
-Hamiltonian Monte Carlo.
+Hamiltonian Monte Carlo introduces some coherence into the random walk by using some principles from Physics. Yes, it takes a little longer to generate each sample, but those samples are guaranteed to explore parameter space much more effectively.
 
 The NUTS sampling algorithm is *much* more efficient than vanilla MCMC.
 
 Treat the parameter vector like the coordinates of a particle on a potential energy surface, where the potential energy is the negative log posterior.
+
+There are more complicated schemes for proposing new locations and the rules for accepting them, but the basic idea is still: (1) pick a new "proposed" location; (2) figure out how much higher or lower that location is compared to your current location; (3) probabilistically stay put or move to that location in a way that respects the overall goal of spending time proportional to height of the location.
 </aside>
 
----
+## {.center}
 
-<img src="https://cdn.rawgit.com/stan-dev/logos/0f0922d5/logo_name_banner.svg" />
+<img src="img/logo-stan.svg" />
 
 <aside class="notes">
 Stan is a high level language for writing statistical models.
@@ -585,26 +630,26 @@ Stan is a high level language for writing statistical models.
 The data block defines variables that have a source outside of Stan.
 </aside>
 
-## Bare Bones Stan
-
-<script src="https://gist.github.com/DataWookie/61d7a662ecaad87044e1c9f161a5245f.js"></script>
-
 ## Running Stan from R
 
 Stan workflow:
 
-- Write Stan program.
-- Stan parser converts this to C++.
-- Compile C++.
-- Execute compiled binary.
+1. Data story (informs the model)
+2. Write Stan program (specify likelihood and priors).
+3. Stan parser converts this to C++.
+4. Compile C++.
+5. Execute compiled binary.
+6. Evaluate results. (Possibly return to 2.)
+7. Inference based on posterior sample.
 
 Using Stan with R:
 
-- A `.R` file.
-- A `.stan` file.
-- Stan workflow automated through R.
+- A `.R` file. USE FONTAWESOME FILE SYMBOL!!!
+- A `.stan` file. USE FONTAWESOME FILE SYMBOL!!!
 
 <aside class="notes">
+Stan is a standalone system. However it's a lot easier to run it from within R.
+
 1. Represent a statistical model by writing its log posterior density (up to
 an normalizing constant that does not depend on the unknown parameters in the
 model) using the Stan modeling language. We recommend using a separate file
@@ -613,7 +658,7 @@ within R.
 2. Translate the Stan program to C++ code using the stanc function.
 3. Compile the C++ code to create a DSO (also called a dynamic link library
 (DLL)) that can be loaded by R.
-4. Run the DSO to sample from the posterior distribution.
+4. Run the DSO to sample from the posterior distribution. This is where the magic happens.
 5. Diagnose non-convergence of the MCMC chains.
 6. Conduct inference based on the posterior sample (the MCMC draws from the
 posterior distribution).
@@ -635,33 +680,31 @@ sessions. To avoid saving the DSO, specify save_dso=FALSE when calling the
 stan function.
 </aside>
 
-## Stan 1 .stan
+## {.center}
 
 ```{r echo=FALSE, cache=FALSE}
-read_chunk("binomial-no-prior.stan")
+read_chunk("binomial-uniform-prior.stan")
 ```
 
-```{text stan_binomial_no_prior, message=FALSE, warning=FALSE, eval=FALSE}
+```{text stan_binomial_uniform_prior, message=FALSE, warning=FALSE, eval=FALSE}
 ```
+
+Model with
+- binomial likelihood and
+- uniform prior.
 
 <aside class="notes">
 The ~ represents a stochastic relationship. An = would indicate a deterministic relationship.
 
-The number of Markov chains to run can be specified using the chains argument
-to the stan or sampling functions. By default, the chains are executed
-serially (i.e., one at a time) using the parent R process. There is also an
-optional cores argument that can be set to the number of chains (if the
-hardware has sufficient processors and RAM), which is appropriate on most
-laptops. We typically recommend first calling
-options(mc.cores=parallel::detectCores()) once per R session so that all
-available cores can be used without needing to manually specify the cores
-argument.
+If we did not specify a prior then Stan would use the uniform prior by defaulr.
 </aside>
 
-## Stan 1 .R
+## {.center}
 
 ```{r message=FALSE, warning=FALSE, results='hide', cache=TRUE}
 library(rstan)
+
+options(mc.cores = parallel::detectCores())
 
 trials <- list(
   N       = nrow(sessions),
@@ -674,49 +717,89 @@ fit <- stan(
   data    = trials,
   chains  = 4,                         # Number of Markov chains
   warmup  = 1000,                      # Number of warmup iterations per chain
-  iter    = 2000,                      # Total number of iterations per chain
-  refresh = 1000                       # Iterations between status update
+  iter    = 2000                       # Total number of iterations per chain
 )
 ```
 
 <aside class="notes">
-We're being rather vague here and not specifying a prior on the model parameter. As a result Stan uses the uniformative uniform prior by default.
+This is the corresponding R code. Things to note:
+
+- it loads the `rstan` library;
+- sets the number of cores to be used for parallel execution (otherwise chains are run in series);
+- data are transferred to Stan via a list;
+- Stan is invoked via the `stan()` function; and
+- parameters specify the number of chains as well as number of warmup and compute iterations per chain.
+
+The number of Markov chains to run can be specified using the chains argument to the stan or sampling functions. By default, the chains are executed serially (i.e., one at a time) using the parent R process. There is also an optional cores argument that can be set to the number of chains (if the hardware has sufficient processors and RAM), which is appropriate on most laptops. We typically recommend first calling options(mc.cores=parallel::detectCores()) once per R session so that all available cores can be used without needing to manually specify the cores argument.
 </aside>
 
-## Stan Results
+---
 
 ```{r}
+traceplot(fit, pars = c("theta"), inc_warmup = TRUE, nrow = 2)
+```
+
+---
+
+```{r}
+class(fit)
+
 fit
 ```
 
 <aside class="notes">
-`n_eff` is the effective number of samples. This takes into account that the samples are not really independent (this is a consequence of correlation in the Markov Chain).
+`n_eff` is the effective sample size. This takes into account that the samples are not independent (this is a consequence of correlation in the Markov Chain). This is a vital component of the Monte Carlo version of the Central Limit Theorem.
+
+What's happening during the warmup phase? The parameters of the MC are getting tuned to optimally explore the parameter space (one aspect of this is choosing the step size).
+
+Maud is immediately more comfortable with this result because, even with a uniform prior, the success rate is constrained to a reasonable domain between 0 and 1.
+
+We don't actually get the posterior density directly. We get a bunch of samples from it instead.
 </aside>
 
-# Stan 1a
+---
 
-```{r stan_binomial_uniform_prior, message=FALSE, warning=FALSE, results='hide', cache=TRUE}
-library(rstan)
-
-trials <- list(
-  N       = nrow(sessions),
-  hits    = sessions$hits,
-  spins   = sessions$spins
-)
-
-fit <- stan(
-  file    = "binomial-uniform-prior.stan",
-  data    = trials,
-  chains  = 4,
-  warmup  = 1000,
-  iter    = 2000,
-  refresh = 1000
-)
+```{r}
+list_of_draws <- extract(fit)
 ```
 
-# Stan 1a
+---
 
-```{r stan_binomial_beta_prior, message=FALSE, warning=FALSE, results='hide', cache=TRUE}
+```{r}
+df_of_draws <- as.data.frame(fit)
+```
+
+---
+
+```{r}
+fit_summary <- summary(fit)
+print(names(fit_summary))
+# [1] "summary"   "c_summary"
+# summary - all chains merged
+# c_summary - individual chains
+print(fit_summary$summary)
+
+# More specific summary.
+# mu_tau_summary <- summary(fit, pars = c("mu", "tau"), probs = c(0.1, 0.9))$summary
+# print(mu_tau_summary)
+```
+
+## Binomial Model: Beta Prior (Stan)
+
+```{r echo=FALSE, cache=FALSE}
+read_chunk("binomial-beta-prior.stan")
+```
+
+```{text stan_binomial_no_prior, message=FALSE, warning=FALSE, eval=FALSE}
+```
+
+<aside class="notes">
+The beta distribution is the conjugate prior for the binomial likelihood (this means that the corresponding posterior will also be a beta distribution).
+</aside>
+
+---
+
+```{r stan_binomial_beta_prior, message=FALSE, warning=FALSE, cache=TRUE, include=FALSE, results='hide'}
 library(rstan)
 
 trials <- list(
@@ -730,32 +813,39 @@ fit <- stan(
   data    = trials,
   chains  = 4,
   warmup  = 1000,
-  iter    = 2000,
-  refresh = 1000
+  iter    = 2000
 )
 ```
 
-<aside class="notes">
-The beta distribution is the conjugate prior for the binomial likelihood (this means that the corresponding posterior will also be a beta distribution).
-</aside>
-
-## Stan 2
 
 ```{r}
 # Stan is generating draws from the posterior and the results (below) are based on those draws.
 
-print(fit, pars=c("mu", "lp__"), probs=c(.1,.5,.9))
+# print(fit, pars = c("mu", "lp__"), probs = c(0.1, 0.5, 0.9))
+# print(fit)
 
-plot(fit)
+# 80% (inner) and 95% (outer) intervals.
+#
+# plot(fit)
+# 
+# plot(fit, plotfun = "hist")
+# plot(fit, plotfun = "dens")
+
+# Autocorrelation between successive samples.
+#
+# plot(fit, plotfun = "ac")
 
 # posterior_interval(fit, prob = 0.5) # Is this function from rstanarm?
 #
 # You can literally say that "there is a 25% chance that it's smaller than..."
 
-traceplot(fit, pars = c("mu"), inc_warmup = TRUE, nrow = 2)
-
-pairs(fit, pars = c("mu", "lp__"), las = 1)
+pairs(fit, pars = c("theta", "lp__"), las = 1)
 ```
+
+
+<aside class="notes">
+Don't think of a confidence interval. These are quantiles of the density. Close to the median they are stable, but further into the tails they can be noisy.
+</aside>
 
 ---
 
@@ -765,12 +855,12 @@ plot(fit, show_density = TRUE, ci_level = 0.5, fill_color = "purple")
 ---
 
 ```{r}
-plot(fit, plotfun = "hist", pars = "mu", include = FALSE)
+plot(fit, plotfun = "hist", pars = "theta", include = FALSE)
 ```
 ---
 
 ```{r}
-plot(fit, plotfun = "trace", pars = c("mu"), inc_warmup = TRUE) + ggtitle("Example of adding title to plot")
+plot(fit, plotfun = "trace", pars = c("theta"), inc_warmup = TRUE) + ggtitle("Example of adding title to plot")
 ```
 
 ## Stan 3
@@ -786,8 +876,7 @@ fit <- stan(
   data    = trials,
   chains  = 4,
   warmup  = 1000,
-  iter    = 2000,
-  refresh = 1000
+  iter    = 2000
 )
 ```
 
@@ -836,10 +925,11 @@ fit <- stan(
   data    = trials,
   chains  = 4,
   warmup  = 1000,
-  iter    = 2000,
-  refresh = 1000
+  iter    = 2000
 )
 ```
+
+## Posterior Predictive Check
 
 ## Stan 7
 
@@ -862,25 +952,30 @@ read_chunk("regression.stan")
 ```{text stan_regression, message=FALSE, warning=FALSE, eval=FALSE}
 ```
 
+<aside class="notes">
+Because the number of spins has been standardised, the intercept will be the wager for the average number of spins.
+</aside>
+
 ## Regression Stan R
 
-```{r cache=TRUE}
+```{r cache=TRUE, include=FALSE}
 trials <- list(
   N       = nrow(sessions),
-  x       = scale(sessions$spins),     # Standardised covariate
+  x       = scale(sessions$spins)[,1], # Standardised covariate
   y       = sessions$wager
 )
-
-options(mc.cores = parallel::detectCores())
 
 fit <- stan(
   file    = "regression.stan",
   data    = trials,
   chains  = 4,
   warmup  = 1000,
-  iter    = 2000,
-  refresh = 1000
+  iter    = 2000
 )
+```
+
+```{r}
+summary(fit)
 ```
 
 <aside class="notes">
@@ -888,6 +983,44 @@ In a linear model we are saying that the response is normally distributed with a
 
 The half-Cauchy is essentially a one-sided, heavy tailed version of the Normal distribution. This constrains the value of sigma to be positive but is not as restrictive as a Normal distribution.
 </aside>
+
+## Payline Hit Rates from RTP
+
+```{r echo=FALSE, cache=FALSE}
+read_chunk("normal-rtp.stan")
+```
+
+```{text stan_normal_rtp, message=FALSE, warning=FALSE, eval=FALSE}
+```
+
+<aside class="notes">
+The priors carry a little information about the probabilities of each payline, but not a lot.
+</aside>
+
+---
+
+```{r cache=TRUE, include=FALSE}
+trials <- list(
+  N       = nrow(sessions),
+  rtp     = sessions$rtp
+)
+
+fit <- stan(
+  file    = "normal-rtp.stan",
+  data    = trials,
+  chains  = 4,
+  warmup  = 1000,
+  iter    = 2000
+)
+
+rtp_summary = data.frame(summary(fit)$summary)
+```
+
+```{r}
+summary(fit)$summary
+```
+
+The overall RTP is `r format(rtp_summary["mu", "mean"] * 100, digits = 3)`.
 
 ## Predictive Inference
 

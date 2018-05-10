@@ -4,9 +4,9 @@ data {
   int spins[N];
 }
 parameters {
-  real<lower=0,upper=1> mu;
+  real<lower=0,upper=1> theta;
 }
 model {
-  hits ~ binomial(spins, mu);          // Likelihood
-  mu ~ beta(2, 2);                     // Prior
+  hits ~ binomial(spins, theta);       // Likelihood
+  theta ~ beta(2, 2);                  // Prior
 }

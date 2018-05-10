@@ -5,8 +5,8 @@ data {
   int spins[N];
 }
 parameters {
-  real<lower=0, upper=1> mu;
+  real<lower=0, upper=1> theta;
 }
 model {
-  hits ~ binomial(spins, mu);
+  hits ~ binomial(spins, theta);
 }
