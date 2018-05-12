@@ -641,8 +641,6 @@ ggplot(chain, aes(x = n, y = theta)) +
 
 <img src="https://rawgit.com/DataWookie/datawookie/master/static/img/logo/logo-stan.svg" />
 
-![](https://rawgit.com/DataWookie/datawookie/master/static/img/logo/logo-stan.svg)
-
 <aside class="notes">
 Stan is a high level language for writing statistical models. It uses Hamiltonian Monte Carlo, which applies some general principles from Physics to provide much more efficient sampling. Yes, it takes a little longer to generate each sample, but those samples are guaranteed to explore parameter space much more effectively.
 
@@ -651,9 +649,7 @@ Stan is a high level language for writing statistical models. It uses Hamiltonia
 The Hamiltonian MC is *much* more efficient than vanilla MCMC or the Metropolis Algorithm.
 </aside>
 
----
-
-Stan workflow:
+## Stan Workflow
 
 1. Data story (informs the model)
 2. Write Stan program (likelihood and priors).
@@ -663,10 +659,7 @@ Stan workflow:
 6. Evaluate results. (Possibly return to 2.)
 7. Inference based on posterior sample.
 
-Using Stan with R:
-
-- A `.R` file. USE FONTAWESOME FILE SYMBOL!!!
-- A `.stan` file. USE FONTAWESOME FILE SYMBOL!!!
+To use `rstan` you need a `.stan` `r icon::fa("file")` and a `.R` `r icon::fa("file")`.
 
 <aside class="notes">
 1. A data story will motivate the Stan model.
@@ -803,10 +796,11 @@ plot(fit, plotfun = "hist", pars = c("theta"), include = TRUE, binwidth = 0.0025
 
 ## {.center}
 
-```{r autocorrelation, echo=FALSE}
+```{r autocorrelation, echo=FALSE, message=FALSE, warning=FALSE}
 # Autocorrelation between successive samples.
 #
-plot(fit, pars = "theta", plotfun = "ac")
+plot(fit, pars = "theta", plotfun = "ac") +
+  scale_y_continuous("Average Autocorrelation")
 ```
 
 <aside class="notes">
@@ -842,16 +836,6 @@ read_chunk("binomial-beta-prior.stan")
 ```{text stan_binomial_beta_prior, message=FALSE, warning=FALSE, eval=FALSE}
 ```
 
-<aside class="notes">
-As an experienced gambler Maud knew that the likelihood of the hit rate was not uniformly distributed between 0 and 1. We could factor this knowledge into the computation by applying a more informed prior. We could use a broad beta distribution peaked at 0.5.
-
-**Notes:**
-
-The beta distribution is the conjugate prior for the binomial likelihood (this means that the corresponding posterior will also be a beta distribution).
-</aside>
-
----
-
 ```{r message=FALSE, warning=FALSE, cache=TRUE, include=FALSE, results='hide'}
 library(rstan)
 
@@ -871,6 +855,11 @@ fit <- stan(
 ```
 
 <aside class="notes">
+As an experienced gambler Maud knew that the likelihood of the hit rate was not uniformly distributed between 0 and 1. We could factor this knowledge into the computation by applying a more informed prior. We could use a broad beta distribution peaked at 0.5.
+
+**Notes:**
+
+The beta distribution is the conjugate prior for the binomial likelihood (this means that the corresponding posterior will also be a beta distribution).
 </aside>
 
 ## {.center}
@@ -932,7 +921,7 @@ pairs(fit, pars = c("mu", "sigma", "lp__"), las = 1)
 A pairs plot lets us interrogate the results. It's clear that both of the model parameters are correlated with the log likelihood, but apparently independent of each other. We've assumed that the parameters are independent, so this is good.
 </aside>
 
-## {.center}
+## {data-background="img/maud-not-cricket.svg" data-background-size="50%" data-background-position="left bottom"}
 
 ```{r echo=FALSE}
 fit
@@ -942,15 +931,15 @@ fit
 rtp_summary = data.frame(summary(fit)$summary)
 ```
 
-The average RTP is around `r sprintf("%.0f", rtp_summary$mean[1] * 100)`%.
-
 <aside class="notes">
 We get reasonable values for the two parameters. However, Maud is concerned about using a Normal distribution for modelling RTP. The left tail of the distribution extends to negative values, which is not physically realisable for RTP.
 
 We can do better!
+
+The average RTP is around `r sprintf("%.0f", rtp_summary$mean[1] * 100)`%.
 </aside>
 
-## {.center}
+## Pay Table: Cat and Mouse {.center}
 
 ```{r echo=FALSE}
 paytable %>% select(description, symbols, payout) %>% kable("html")
@@ -959,7 +948,7 @@ paytable %>% select(description, symbols, payout) %>% kable("html")
 ---
 
 ```{r echo=FALSE, cache=FALSE}
-read_chunk("normal-rtp.stan")
+read_chunk("lognormal-rtp.stan")
 ```
 
 ```{text stan_normal_rtp, message=FALSE, warning=FALSE, eval=FALSE}
@@ -967,6 +956,8 @@ read_chunk("normal-rtp.stan")
 
 <aside class="notes">
 The priors are based on Maud's gut feel for the relative frequency of each of the payouts. They carry a little information about the probabilities of each payline, but not a lot.
+
+The mean of `lognormal()` is `exp(mu + sigma * sigma / 2)`.
 </aside>
 
 ---
@@ -978,18 +969,16 @@ trials <- list(
 )
 
 fit <- stan(
-  file    = "normal-rtp.stan",
+  file    = "lognormal-rtp.stan",
   data    = trials,
   chains  = 4,
   warmup  = 1000,
   iter    = 2000
 )
-
-rtp_summary = data.frame(summary(fit)$summary)
 ```
 
 ```{r traceplot_rtp, echo=FALSE}
-traceplot(fit, pars = paste0("mu", 1:6), inc_warmup = TRUE, nrow = 3)
+traceplot(fit, pars = paste0("theta[", 1:6, "]"), inc_warmup = TRUE, nrow = 3)
 ```
 
 <aside class="notes">
@@ -998,22 +987,47 @@ It's readily apparent here the importance of the warmup iterations: the first fe
 
 ---
 
-```{r}
-summary(fit)$summary
+```{r echo=FALSE}
+(rtp_summary = summary(fit, probs = c(0.025, 0.975), pars = c(paste0("theta[", 1:6, "]"), "sigma", "pay"))$summary)
 ```
 
-The overall RTP is `r format(rtp_summary["mu", "mean"] * 100, digits = 3)`.
+Overall RTP is `r format(rtp_summary[8,1] * 100, digits = 3)`.
+
+The 1x payout is triggered once in every `r format(1 / rtp_summary[1,1], digits = 3)` spins.
+
+The 100x payout is only triggered once in every `r format(1 / rtp_summary[6,1], digits = 3)` spins.
 
 <aside class="notes">
+These are the vital statistics for determining the characteristics of the game. So we have effectively reverse engineered it.
 </aside>
 
-## Predictive Inference
+---
 
-## Posterior Predictive Distribution
+```{r hist_rtp_simulated, echo=FALSE, cache=TRUE}
+simulated <- tibble(rtp = extract(fit, "simulated") %>% unlist())
 
-$$
-p(\tilde{y}|y) = \int_\theta p(\tilde{y}|\theta) p(\theta|y) d\theta
-$$
+ggplot(sessions, aes(x = rtp)) +
+  geom_histogram(aes(y = ..density..), binwidth = 0.2, boundary = 0, fill = "skyblue") +
+  geom_histogram(data = simulated, aes(x = rtp, y = ..density..), binwidth = 0.05, boundary = 0, alpha = 0.125, col = "black") +
+  geom_vline(xintercept = c(0.5, 1.0), lty = "dashed") +
+  scale_x_continuous("RTP", labels = scales::percent, limits = c(0, 5)) +
+  scale_y_continuous("Density") +
+  theme_classic()
+```
+
+<aside class="notes">
+It's good practice to do a posterior predictive check. We do this by generating simulated samples from the posterior distribution. These samples are specified in the `generated quantities` block. It looks like there is pretty good agreement between the data and the model.
+</aside>
+
+## Maud's Burning Questions {.center}
+
+- What is the hit rate?
+- What is the RTP?
+- What is the hit rate for each winning combination?
+
+<aside class="notes">
+So, returning to Maud's three burning questions, not only have we managed to obtain point estimates to answer each of them, but we have actually generated distributions for each of these quantities, which are enormously more informative.
+</aside>
 
 ## What is Bayes Good For?
 
@@ -1040,6 +1054,15 @@ So these are not black box Machine Learning models where we simply want to make 
 <!-- ============================================================================================================== -->
 
 # Extra Stuff
+
+
+## Predictive Inference
+
+## Posterior Predictive Distribution
+
+$$
+p(\tilde{y}|y) = \int_\theta p(\tilde{y}|\theta) p(\theta|y) d\theta
+$$
 
 ## Poisson
 

@@ -1,3 +1,4 @@
+## @knitr stan_binomial_beta_prior
 data {
   int<lower=0> N;
   int hits[N];
