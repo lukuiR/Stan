@@ -17,7 +17,9 @@ editor_options:
   chunk_output_type: console
 ---
 
-# {data-background="img/maud-introduction.svg" data-background-size="50%" data-background-position="left bottom"}
+# Meet Maud
+
+## {data-background="img/maud-introduction.svg" data-background-size="50%" data-background-position="left bottom"}
 
 <!--
     Other resources:
@@ -55,6 +57,8 @@ library(knitr)
 # Plotting options for RStan.
 #
 rstan_gg_options(fill = "skyblue", color = "skyblue4", pt_color = "red")
+
+rstan_options(rstan_warmup_bg_col="red")
 ```
 
 <aside class="notes">
@@ -64,7 +68,7 @@ Enough about me. I want you to meet somebody else.
 
 Meet my friend Maud.
 
-Maud is 71. She likes cats and gardening.
+Maud is 73. She likes cats and gardening.
 
 She also has a gambling problem.
 </aside>
@@ -92,9 +96,7 @@ paytable %>% select(description, symbols, payout) %>% kable("html")
 ```
 
 <aside class="notes">
-Her weakness is slot machines. She's positively obsessed by them.
-
-To be honest, Maud is generally rather obsessive. As you'll see, this will work in our favour.
+Her weakness is slot machines. She's positively obsessed by them. And she has one particular favourite called "Cat and Mouse". The only information that's publicly available about this game is the paytable.
 </aside>
 
 ## Maud's Burning Questions {.center}
@@ -104,7 +106,7 @@ To be honest, Maud is generally rather obsessive. As you'll see, this will work 
 - What is the hit rate for each winning combination?
 
 <aside class="notes">
-Maud wants to know three things about her favourite game:
+But Maud wants to know more. Specifically:
 
 - what proportion of spins result in a win (the hit rate);
 - what proportion of her wager gets paid back to her on average (the RTP); and
@@ -116,9 +118,7 @@ If she could get her hands on the uncertainties in these estimates, that would b
 ## {data-background="img/maud-love-r.svg" data-background-size="50%" data-background-position="left bottom"}
 
 <aside class="notes">
-Somewhat surprisingly, Maud is also a big fan of R.
-
-It's been really, um interesting, to have her as a collaborator.
+Somewhat surprisingly, Maud is also a big fan of R. So we embarked on learning some Bayesian techniques together.
 </aside>
 
 ## Maud's Data (by Session)
@@ -174,17 +174,7 @@ sessions %>% select(-details)
 ```
 
 <aside class="notes">
-Fortunately for us Maud obsessively records her gambling stats. As a result we have a rather nice, rich data set to play with. At the session level the most important bits of information are the number of spins and the associated number of hits. It might occur to you that the relationship between these two quantities could be modelled as a binomial process.
-</aside>
-
-## Maud's Data (by Spin)
-
-```{r}
-sessions %>% select(session, details) %>% unnest()
-```
-
-<aside class="notes">
-We can also unpack these data down to the level of individual spins, where we have something that could be modelled as a Bernoulli process.
+She's also diligently recorded her gambling statistics. As a result we have a rather nice, rich data set to play with. At the session level the most important bits of information are the number of spins and the associated number of hits. It might occur to you that the relationship between these two quantities could be modelled as a binomial process.
 </aside>
 
 # Q1: Hit Rate {.center}
@@ -231,7 +221,7 @@ Well, the hit rate, $\theta$, is just the expected number of hits per spin.
 
 So we could lump all of the data together and treat it as a single massive binomial experiment, taking the ratio of the total number of hits to the total number of spins across all sessions.
 
-This would certainly maximise the amount of data and should, in principle, give us a reasonably accurate result. But there is no way to quantify our uncertainty. Such a paucity of information leads to overconfidence in the quality of the estimate.
+This would certainly maximise the amount of data and should, in principle, give us a reasonably accurate result. But there is no way to quantify our uncertainty.
 </aside>
 
 ## {.center}
@@ -256,15 +246,10 @@ session_summary <- sessions %>% summarise(
 session_summary %>% select(session_avg, session_std)
 ```
 
-95% confidence interval () extends from `r format(session_summary$ci_lower * 100, digits = 3)`% to  `r format(session_summary$ci_upper * 100, digits = 3)`%.
+95% confidence interval extends from `r format(session_summary$ci_lower * 100, digits = 3)`% to  `r format(session_summary$ci_upper * 100, digits = 3)`%.
 
 <aside class="notes">
 Another approach is to treat each session as an independent binomial experiment, each of which yields an estimate for the hit rate.
-
-Now you can calculate the average and spread. However, there are two problems with this:
-
-1. it ignores the number of spins per session (this could be incorporated by using weighted statistics) and
-2. it assumes that the hit rate is Normally distributed (and it's not!).
 
 Maud is fairly happy with this result, but it does concern her that the confidence interval on the hit rate could, in principle, extend to values less than zero or greater than one. Neither of which is physically possible. There are no constraints on $\theta$.
 </aside>
@@ -299,7 +284,7 @@ P(k | n, \theta) = \prod_i P(k_i | n_i, \theta) = L(\theta; n, k)
 $$
 
 <aside class="notes">
-Let's consider what the probability distribution looks like for all of the sessions lumped together. If we assume that they are independent, which is a reasonable assumption, then we can simply multiply together the probability distributions for each session. This gives us, one the one hand, a distribution for the number of hits in each of the sessions. But if we think of this as a function of $\theta$ then this gives the likelihood of a particular value of $\theta$ given observed values of $k_i$ and $n_i$.
+Let's consider the joint probability distribution for all of the sessions lumped together. If we assume that they are independent, which is a reasonable assumption, then we can simply multiply together the distributions for each session. This gives us, one the one hand, a distribution for the number of hits in each of the sessions. But if we think of this as a function of $\theta$ then this gives the likelihood of a particular value of $\theta$ given observed values of $k_i$ and $n_i$.
 
 If we maximise this function then we have the most likely value of $\theta$ based on all of the data.
 
@@ -334,11 +319,12 @@ binom_log_likelihood <- function(theta, k, n) {
 ```
 
 <aside class="notes">
-Neglect the binomial coefficient since it's a constant (as a function of theta).
+However we'd be multiplying together a load of small numbers, which would mean that we would rapidly lose precision. Instead we work with the log likelihood.
 
-The log likelihood is generally easier to work with because it gets around the problem of multiplying together many small numbers.
+**Note:**
 
-Because the logarithm is a strictly increasing function, the log likelihood is maximised in the same place as the likelihood.
+- Neglect the binomial coefficient since it's a constant (as a function of theta).
+- Because the logarithm is a strictly increasing function, the log likelihood is maximised in the same place as the likelihood.
 </aside>
 
 ---
@@ -357,6 +343,7 @@ parameters <- tibble(theta = seq(0, 1, 0.01)) %>%
 ggplot(parameters, aes(theta, log_likelihood)) +
   geom_point() +
   geom_vline(xintercept = parameters[which.max(parameters$log_likelihood),]$theta, lty = "dashed") +
+  scale_x_continuous(expression(theta)) +
   scale_y_continuous("Log likelihood", limits = c(-6000, -1000)) +
   theme_classic()
 ```
@@ -390,15 +377,21 @@ where
 <aside class="notes">
 Bayesian Theorem is probably familiar to many of you, but let's just take a moment to review.
 
+The Bayesian technique is not entirely dissimilar to Maximum Likelihood, however, it introduces the concept of the prior, which is multiplied by the likelihood to give the posterior. Basically we are saying, "We have some existing knowledge about the model parameter (given by the prior) and we know how the likelihood of the model parameters are affected by the data (given by the likelihood). And we use these pieces of information to get the probability of the "
+
 A Bayesian model is the combination of a prior and a likelihood.
+
+The prior is specifies what we know about the model parameters before considering the data.
 
 The likelihood characterises the model and gives the probability of the data conditional on the model and choice of parameter.
 
-The prior is specifies what we know about the model parameter before considering the data.
-
-The denominator is sometimes called the "Evidence". It's just the marginal distribution of $y$.
+The posterior is what we know about the model parameters after factoring in the data.
 
 It's also taken a while for these techniques to take off because they are computationally challenging. Hardware advances have made them eminently feasible.
+
+**Note:**
+
+The denominator is sometimes called the "Evidence". It's just the marginal distribution of $y$.
 
 So much for theory. Analytical expressions are rare in practice.
 
@@ -500,7 +493,7 @@ Generate independent samples of $\theta^{(i)}$.
 
 - Need to have $p(\theta^{(m)} | y, X)$.
 
-```{r echo=FALSE, warning=FALSE, fig.height=4.5}
+```{r echo=FALSE, warning=FALSE, fig.height=4.5, fig.align='right'}
 set.seed(13)
 
 parameters <- tibble(
@@ -537,7 +530,7 @@ Generate a series of samples: $\theta^1$, $\theta^2$, $\theta^3$, ... $\theta^M$
 - $\theta^m$ depends on $\theta^{m-1}$.
 - Need to have $p(\theta^{m} | \theta^{m-1}, y, X)$.
 
-```{r echo=FALSE, warning=FALSE, fig.height=4.5}
+```{r echo=FALSE, warning=FALSE, fig.height=4.5, fig.align='right'}
 ggplot(parameters) +
   geom_segment(aes(x = x1, y = y1, xend  = x2, yend = y2), lty = "dashed") +
   geom_point(aes(x = x1, y = y1), color = "red", size = 3) +
@@ -552,13 +545,11 @@ Markov Chain Monte Carlo generates a sequence of samples from a distribution. Th
 
 ## Metropolis-Hastings Algorithm
 
-Randomly sample $\theta^{(0)}$.
-
-Set $i = 1$.
-
-1. Randomly sample proposal $\theta^{*}$ in the vicinity of $\theta^{i-1}$.
-2. Sample $u$ uniformly on $[0, 1)$.
-3. 
+1. Randomly sample $\theta^{(0)}$.
+2. Set $i = 1$.
+3. Randomly sample proposal $\theta^{*}$ in the vicinity of $\theta^{i-1}$.
+4. Sample $u$ uniformly on $[0, 1)$.
+5. 
 
 $$
 \theta^{(i)} = \left\{\begin{array}{ll}
@@ -567,8 +558,8 @@ $$
 \end{array}\right.
 $$
 
-4. Increment $i$.
-5. Return to 1.
+6. Increment $i$.
+7. Return to 1.
 
 <aside class="notes">
 The Metropolis-Hastings Algorithm is the classical implementation of MCMC.  The algorithm proceeds by sampling a proposal point in the vicinity of the current point and then either accepting or rejecting that point depending on the ratio of the probability density at the two points. If the probability of the new point is higher then we always accept. If it's lower then we accept with a probability that is the ratio of the densities.
@@ -577,7 +568,7 @@ It might occur to you that the samples are now no longer independent. And you'd 
 
 Metropolis Monte Carlo is better than the Grid Approximation. However in an absolute sense it's not really all that good. Especially not in higher dimensions, where it can take a very long time to sample the parameter space.
 
-**Notes:**
+**Note:**
 
 The size of the "vicinity" (effectively the step size) determines the acceptance rate of new points. If it's too large then few new points will be accepted. If it's too small then the rate of diffusion will be painfully slow.
 
@@ -634,7 +625,7 @@ ggplot(chain, aes(x = n, y = theta)) +
 <aside class="notes">
 Stan is a high level language for writing statistical models. It uses Hamiltonian Monte Carlo, which applies some general principles from Physics to provide much more efficient sampling. Yes, it takes a little longer to generate each sample, but those samples are guaranteed to explore parameter space much more effectively.
 
-**Notes:**
+**Note:**
 
 The Hamiltonian MC is *much* more efficient than vanilla MCMC or the Metropolis Algorithm.
 </aside>
@@ -646,7 +637,7 @@ The Hamiltonian MC is *much* more efficient than vanilla MCMC or the Metropolis 
 3. Stan parser converts this to C++.
 4. Compile C++.
 5. Execute compiled binary.
-6. Evaluate results. If <span style="color: red;">!!! SAD FACE !!!</span> return to 2.
+6. Evaluate results. Optionally return to 2.
 7. Inference based on posterior sample.
 
 To use `rstan` you need a `.stan` `r icon::fa("file")` and a `.R` `r icon::fa("file")`.
@@ -762,8 +753,6 @@ The number of samples that we get is precisely the total number of active iterat
 
 ---
 
-CAN WE MAKE BACKGROUND FOR WARMUP DARKER?
-
 ```{r traceplot_binomial, echo=FALSE}
 estimate_hit_rate = summary(fit)$summary[1, 1]
 
@@ -861,7 +850,7 @@ As an experienced gambler Maud knew that the likelihood of the hit rate was not 
 
 Let's move onto Maud's second burning question, quantifying the RTP. 
 
-**Notes:**
+**Note:**
 
 - The beta distribution is the conjugate prior for the binomial likelihood (this means that the corresponding posterior will also be a beta distribution).
 </aside>
@@ -899,7 +888,7 @@ Now our Stan code specifies a log-Normal for the likelihood, with two parameters
 
 We're not going to specify a prior for either of the model parameters, but simply constrain them to being positive real numbers.
 
-**Notes:**
+**Note:**
 
 - The mean of `lognormal()` is `exp(mu + sigma * sigma / 2)`.
 </aside>
@@ -960,18 +949,16 @@ print(fit, pars = c("mu", "sigma", "lp__"))
 ```
 
 <aside class="notes">
-We get reasonable values for the two parameters. However, Maud is concerned about using a Normal distribution for modelling RTP. The left tail of the distribution extends to negative values, which is not physically realisable for RTP.
-
-We can do better!
-
 The average RTP is around `r sprintf("%.0f", estimate_rtp * 100)`%.
 </aside>
 
 # Q3: Hit Rate per Combination {.center}
 
----
+## Pay Table: Cat and Mouse {.center}
 
-REPEAT PAYTABLE HERE
+```{r echo=FALSE}
+paytable %>% select(description, symbols, payout) %>% kable("html")
+```
 
 ---
 
@@ -1011,15 +998,15 @@ traceplot(fit, pars = paste0("theta[", 1:6, "]"), inc_warmup = TRUE, nrow = 3)
 It's readily apparent here the importance of the warmup iterations: the first few samples for some of the parameters are very far from the core of their distribution. This could be improved by providing more restrictive priors.
 </aside>
 
----
+## {.center}
 
 ```{r echo=FALSE}
 (rtp_summary = summary(fit, probs = c(0.025, 0.975), pars = c(paste0("theta[", 1:6, "]")))$summary)
 ```
 
-The 1x payout is triggered once in every `r format(1 / rtp_summary[1, 1], digits = 0)` spins.
+The 1x payout is triggered on average every `r format(1 / rtp_summary[1, 1], digits = 0)` spins.
 
-The 100x payout is only triggered once in every `r format(1 / rtp_summary[6, 1], digits = 3)` spins.
+The 100x payout is triggered on average only every `r format(1 / rtp_summary[6, 1], digits = 3)` spins.
 
 <aside class="notes">
 These are the vital statistics for determining the characteristics of the game. So we have effectively reverse engineered it.
@@ -1045,15 +1032,13 @@ So, returning to Maud's three burning questions, not only have we managed to obt
 - Models where we want to quantify parameter uncertainty.
 - Generate some derived quantity from the posterior.
 
-CAN GET A GIF FOR RTP > 1??? Like "WINNING!"
-
 <aside class="notes">
 So these are not black box Machine Learning models where we simply want to make the best possible predictions. Here we actually care what's going on inside the box.
 
 I've really just scratched the surface and can't claim to have done Bayes or Stan any real justice. But I hope that if you haven't tried it before you'll take a gamble. I can assure you that your RTP will be greater than one.
 </aside>
 
-## Here's the Kicker {.center}
+## Here's the Kicker
 
 What's the probability of breaking even?
 
@@ -1071,6 +1056,12 @@ mean(simulated$rtp > 2)
 Finally here's the kicker. Since we have access to the posterior distribution we are able to calculate all manner of statistics without relying on (poor) asymptotic approximations. For example, we can find the probability of breaking even or doubling our money.
 
 These figures are enough to make Maud reconsider her gambling fixation.
+</aside>
+
+## {data-background="img/maud-crochet.svg" data-background-size="50%" data-background-position="left bottom"}
+
+<aside class="notes">
+She's going to take up a more conservative and age-appropriate hobby.
 </aside>
 
 <!-- ============================================================================================================== -->
@@ -1185,6 +1176,16 @@ Not everybody's a fan of the Bayesian approach. Ronald Fisher, had this to say a
 Possibly one of the reasons for their skepticism is that historically it has been computationally challening to actually *apply* these techniques. This is no longer true.
 
 In general you can't apply Bayesian techniques analytically.
+</aside>
+
+## Maud's Data (by Spin)
+
+```{r}
+sessions %>% select(session, details) %>% unnest()
+```
+
+<aside class="notes">
+We can also unpack these data down to the level of individual spins, where we have something that could be modelled as a Bernoulli process.
 </aside>
 
 ## ShinyStan
