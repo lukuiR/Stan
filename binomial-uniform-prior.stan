@@ -5,7 +5,7 @@ data {
   int spins[N];
 }
 parameters {
-  real theta;
+  real<lower=0, upper=1> theta;
 }
 model {
   hits ~ binomial(spins, theta);       // Likelihood
