@@ -1,3 +1,4 @@
+## @knitr stan_bernoulli
 data {
   int<lower = 0> N;
   int<lower = 0, upper = 1> y[N];
