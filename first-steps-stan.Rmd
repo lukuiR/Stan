@@ -17,8 +17,8 @@ editor_options:
   chunk_output_type: console
 ---
 
-<img src="img/satrday-2017-banner.png" width="85%">
-<img src="img/satrday-2018-banner.png" width="85%">
+<img src="img/satrday-2017-banner.png" width="100%">
+<img src="img/satrday-2018-banner.png" width="100%">
 
 # Meet Maud {.center}
 
