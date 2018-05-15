@@ -17,6 +17,11 @@ editor_options:
   chunk_output_type: console
 ---
 
+---
+
+<img src="img/satrday-2017-banner.png" width="85%">
+<img src="img/satrday-2018-banner.png" width="85%">
+
 # Meet Maud {.center}
 
 ## {data-background="img/maud-introduction.svg" data-background-size="50%" data-background-position="left bottom"}
@@ -98,7 +103,7 @@ paytable %>% select(description, symbols, payout) %>% kable("html")
 ```
 
 <aside class="notes">
-Her weakness is slot machines. She's positively obsessed by them. And she has one particular favourite called "Cat and Mouse". The only information that's publicly available about this game is the paytable.
+Her weakness is slot machines. She's positively obsessed by them. And she has one particular favourite called "Tom and Jerry". The only information that's publicly available about this game is the paytable. This tells you what the payout is for each of the winning combinations.
 </aside>
 
 ## Maud's Burning Questions {.center}
@@ -120,7 +125,7 @@ If she could get her hands on the uncertainties in these estimates, that would b
 ## {data-background="img/maud-love-r.svg" data-background-size="50%" data-background-position="left bottom"}
 
 <aside class="notes">
-Somewhat surprisingly, Maud is also a big fan of R. So the two of us formed a litte study group to learn about Bayesian techniques.
+Somewhat surprisingly, Maud is also a big fan of R. So the two of us formed a litte study group to learn about Bayesian techniques and see if we could use them to answer those questions.
 </aside>
 
 ## Maud's Data (by Session)
@@ -172,17 +177,23 @@ sessions <- inner_join(
 ```
 
 ```{r}
-sessions %>% select(-details)
+sessions
 ```
 
 <aside class="notes">
-Fortunately Maud has diligently recorded her gambling statistics. As a result we have a rather nice, rich data set to play with. At the session level the most important bits of information are the number of spins and the associated number of hits.
+Fortunately Maud has diligently recorded her gambling statistics. As a result we have a rich data set to play with. At the session level the most important bits of information are the number of spins and the associated number of hits. We also have the total wager and payout for each session.
 </aside>
 
 ## Maud's Data (by Spin)
 
 ```{r}
-(spin <- sessions %>% select(details) %>% unnest() %>% mutate(success = as.integer(payout > 0)))
+spin <- sessions %>%
+  select(details) %>%
+  unnest() %>%
+  mutate(success = as.integer(payout > 0))
+```
+```{r echo=FALSE}
+spin
 ```
 
 <aside class="notes">
@@ -192,20 +203,6 @@ So let's kick off by addressing Maud's first question.
 </aside>
 
 # Q1: Hit Rate {.center}
-
-## {.center}
-
-Probability distribution for Bernoulli process:
-
-$$
-P(k | \theta) = \theta^k (1 - \theta)^{1 - k}
-$$
-
-where
-
-- $k = 0$ indicates failure;
-- $k = 1$ indicates success; and
-- the probability of success on any trial is $\theta$.
 
 ## {.center}
 
@@ -228,6 +225,25 @@ At the session level the relationship between spins and hits can be modelled as 
 The binomial distribution allows us to calculate the probability of $k$ given specific values for $n$ and $\theta$. So this assumes that you know $\theta$... But what if you don't? Certainly for most slot machines you don't know the probability of winning. If you did then you probably wouldn't be very tempted to play.
 
 Suppose we had observations of $k$ and $n$, and wanted to estimate $\theta$.
+</aside>
+
+## {.center}
+
+Probability distribution for Bernoulli process:
+
+$$
+P(k | \theta) = \theta^k (1 - \theta)^{1 - k}
+$$
+
+where
+
+- $k = 0$ indicates failure;
+- $k = 1$ indicates success; and
+- the probability of success on any trial is $\theta$.
+
+
+<aside class="notes">
+A Bernoulli process is the atomic component of a binomial process and it considers a single trial at a time.
 </aside>
 
 ## Bayes' Theorem {data-background="img/maud-homie.svg" data-background-size="50%" data-background-position="right bottom"}
@@ -367,64 +383,6 @@ ggplot(prior_beta, aes(x = theta, y = p)) +
   theme_classic()
 ```
 
-## Monte Carlo (Plain Vanilla Version)
-
-Generate independent samples of $\theta^{(i)}$.
-
-- Need to have $p(\theta^{(m)} | y, X)$.
-
-```{r echo=FALSE, warning=FALSE, fig.height=4.5, fig.align='right'}
-set.seed(13)
-
-parameters <- tibble(
-  x1 = c(NA, rnorm(20)),
-  y1 = c(NA, rnorm(20))
-) %>% mutate(
-  x2 = c(na.omit(x1), NA),
-  y2 = c(na.omit(y1), NA)
-)
-
-ggplot(parameters) +
-  geom_point(aes(x = x1, y = y1), color = "red", size = 3) +
-  labs(x = "", y = "") +
-  theme_classic() +
-  theme(axis.text = element_blank(), axis.ticks = element_blank(), axis.line = element_blank(), aspect.ratio = 1)
-```
-
-<aside class="notes">
-Monte Carlo is an alternative technique which generates independent, random samples from the parameter space.
-
-Although it's better in higher dimensions than the grid approximation, it's still far from perfect.
-
-However there's yet another alternative...
-
-**Note:**
-
-The objective is to jump around parameter space in such a way that the probability of being at a point is proportional to the distribution.
-
-Efficient algorithms exist for doing this with simple distributions. However, any non-trivial distribution will generally require you to apply something like rejection sampling. And to make that efficient we'd need to know the maximum value of the distribution.
-</aside>
-
-## Markov Chain Monte Carlo (MCMC)
-
-Generate a series of samples: $\theta^1$, $\theta^2$, $\theta^3$, ... $\theta^M$.
-
-- $\theta^m$ depends on $\theta^{m-1}$.
-- Need to have $p(\theta^{m} | \theta^{m-1}, y, X)$.
-
-```{r echo=FALSE, warning=FALSE, fig.height=4.5, fig.align='right'}
-ggplot(parameters) +
-  geom_segment(aes(x = x1, y = y1, xend  = x2, yend = y2), lty = "dashed") +
-  geom_point(aes(x = x1, y = y1), color = "red", size = 3) +
-  labs(x = "", y = "") +
-  theme_classic() +
-  theme(axis.text = element_blank(), axis.ticks = element_blank(), axis.line = element_blank(), aspect.ratio = 1)
-```
-
-<aside class="notes">
-Markov Chain Monte Carlo generates a sequence of samples where each new sample is random but also dependent on the previous sample.
-</aside>
-
 ## {.center}
 
 <img src="https://rawgit.com/DataWookie/datawookie/master/static/img/logo/logo-stan.svg" />
@@ -476,7 +434,7 @@ This is the basic process for working with Stan.
 Stan is a standalone system. However it's a lot easier to run it from within R.
 </aside>
 
-## Stan Skeleton
+## Stan Skeleton {.center}
 
 <script src="https://gist.github.com/DataWookie/61d7a662ecaad87044e1c9f161a5245f.js"></script>
 
@@ -543,6 +501,8 @@ This is the corresponding R code. Things to note:
 - specify the number of chains as well as number of warmup and compute iterations per chain.
 
 The "chains" are initially a little mysterious, but these are basically just independent series of samples. They aid better sampling of parameter space and also facilitate parallelism.
+
+The warmup is a number of iterations during which the distribution should, in principle, achieve an equilibrium.
 
 Note that there are 1000 iterations in total per chain, of which 500 are warmup, which leaves 500 active iterations. So, in total there are 1000 (2 times 500) active iterations.
 
@@ -615,6 +575,28 @@ The samples for success probability look like they have a Normal distribution an
 
 ## {.center}
 
+```{r}
+print(fit, probs = c(0.025, 0.5, 0.975))
+```
+
+Use `summary()` to get information for each chain.
+
+<aside class="notes">
+This is very neatly presented in the `stanfit` summary information.
+
+There's the mean value of `theta` as well as the lower and upper quantiles of the distribution. Don't think of a confidence interval. These are quantiles of the density. Close to the median they are stable, but further into the tails they can be noisy.
+
+The average hit rate is in good agreement with our earlier result.
+
+Maud is immediately more comfortable with this result because, even with a uniform prior, the success rate is constrained to a reasonable domain between 0 and 1.
+
+`n_eff` is the effective sample size. This takes into account that the samples are not independent (this is a consequence of correlation in the Markov Chain). This is a vital component of the Monte Carlo version of the Central Limit Theorem.
+
+We can see the degree of correlation in a simple autocorrelation plot.
+</aside>
+
+## {.center}
+
 ```{r echo=FALSE, cache=FALSE}
 read_chunk("binomial-beta-prior.stan")
 ```
@@ -665,8 +647,6 @@ fit <- stan(
 print(fit, probs = c(0.025, 0.5, 0.975))
 ```
 
-Use `summary()` to get information for each chain.
-
 <aside class="notes">
 This is very neatly presented in the `stanfit` summary information.
 
@@ -711,6 +691,8 @@ ggplot(sessions, aes(x = rtp)) +
 ```
 
 <aside class="notes">
+In an ideal world RTP would be close to 1. However, this is not the case. A lower RTP obviously favours the casino.
+
 Looking at the distribution of RTP values we can see that there is appreciable variation between sessions. We'd like to quantify the mean RTP and get an idea of the associated uncertainties.
 
 Now this distribution is definitely not Normal. The long tail is a dead giveaway. Maybe it could be described by a log-Normal though? This makes sense too based on the multiplicative nature of slot machine returns.
@@ -760,20 +742,6 @@ A pairs plot lets us interrogate the results. It's clear that both of the model 
 </aside>
 -->
 
-## {data-background="img/maud-not-cricket.svg" data-background-size="50%" data-background-position="left bottom"}
-
-```{r echo=FALSE}
-rtp_summary = summary(fit, pars = c("mu","sigma"))$summary
-
-estimate_rtp = rtp_summary[1, 1]
-
-print(fit, pars = c("mu", "sigma", "lp__"))
-```
-
-<aside class="notes">
-The average RTP is around `r sprintf("%.0f", estimate_rtp * 100)`%.
-</aside>
-
 ---
 
 ```{r hist_rtp_simulated, echo=FALSE, warning=FALSE, cache=TRUE}
@@ -794,7 +762,21 @@ It's good practice to do a posterior predictive check. We do this by generating 
 These simulated values take into account the uncertainties in the model parameters too.
 </aside>
 
-## Here's the Kicker
+## {data-background="img/maud-not-cricket.svg" data-background-size="50%" data-background-position="right bottom"}
+
+```{r echo=FALSE}
+rtp_summary = summary(fit, pars = c("mu","sigma"))$summary
+
+estimate_rtp = rtp_summary[1, 1]
+
+print(fit, pars = c("mu", "sigma", "lp__"))
+```
+
+<aside class="notes">
+The average RTP is around `r sprintf("%.0f", estimate_rtp * 100)`%.
+</aside>
+
+## Here's the Kicker {.center}
 
 What's the probability of breaking even?
 
@@ -841,8 +823,6 @@ We've defined a vector of rate parameters, `theta`, and another parameter, `pay`
 The priors are based on Maud's gut feel for the relative frequency of each of the payouts. They carry a little information about the probabilities of each payline, but not a lot.
 </aside>
 
----
-
 ```{r cache=TRUE, include=FALSE}
 trials <- list(
   N       = nrow(sessions),
@@ -858,7 +838,7 @@ fit <- stan(
 )
 ```
 
-```{r traceplot_rtp, echo=FALSE}
+```{r traceplot_rtp, eval=FALSE, include=FALSE}
 traceplot(fit, pars = paste0("theta[", 1:6, "]"), inc_warmup = TRUE, nrow = 3)
 ```
 
@@ -888,28 +868,29 @@ These are the vital statistics for determining the characteristics of the game. 
 
 <aside class="notes">
 She's going to take up a more conservative and age-appropriate hobby.
+
+Maud is going to start indulging in more sedate and age-appropriate hobbies like crochet.
 </aside>
 
-## Maud's Bayesian Answers {.center}
-
-- What is the hit rate? **`r sprintf("%.1f", estimate_hit_rate * 100)`%**
-- What is the RTP? **`r sprintf("%.1f", estimate_rtp * 100)`%**
-- What is the hit rate for each winning combination?
-    - **frequent low paying combinations (every `r format(1 / rtp_summary[1, 1], digits = 0)` spins for 1x)**
-    - **rare high paying combinations (every `r format(1 / rtp_summary[6, 1], digits = 3)` spins for 100x)**
-
-<aside class="notes">
-So, returning to Maud's three burning questions, not only have we managed to obtain point estimates to answer each of them, but we have actually generated distributions for each of these quantities, which are enormously more informative. With this kind of information in hand it becomes relatively simple to reverse engineer such a game.
-</aside>
-
-## Why Stan? (and Bayesian techniques in general) {.center}
+## Why Stan? {.center}
 
 - Extract maximum information from your data.
 - Learning curve is not as steep as you might think.
 
+<aside class="notes">
+We could have got most of these results using frequentist techniques, so why use Stan?
+
+Maud can do it. I can do it. And so can you.
+</aside>
+
 ## {.center}
 
-<div style="text-align: center; margin-top: 50px; font-size: 3em; color: DodgerBlue;">Do cool things with Stan!</div>
+<div style="text-align: center; font-size: 1.5em;">Do</div>
+<div style="text-align: center; font-size: 3.0em; color: #3498db;">cool things</div>
+<div style="text-align: center; font-size: 1.5em;">with</div>
+<div style="text-align: center; font-size: 3.0em; color: #3498db;">Stan!</div>
+
+<div class="author-info" style="margin-top: 3em;"><i class="fa fa-envelope"></i> andrew@exegetic.biz | <i class="fab fa-twitter"></i> <a href="https://twitter.com/DataWookie">DataWookie</a> | <i class="fab fa-github"></i> <a href="https://github.com/DataWookie">DataWookie</a></div>
 
 <aside class="notes">
 I've really just scratched the surface and can't claim to have done Bayes or Stan any real justice. But I hope that if you haven't tried it before you'll take a gamble. I can assure you that your RTP will be greater than one.
@@ -1003,23 +984,7 @@ ggplot(chain, aes(x = n, y = theta)) +
   geom_line() +
   scale_y_continuous(limits = c(0, 1))
 ```
-
-## Resources
-
-- http://mc-stan.org/workshops/
-- <a href="http://mc-stan.org/">Stan web site</a>
-- <a href="http://www.mcmchandbook.net/HandbookChapter5.pdf">MCMC Using Hamiltonian Dynamics</a> (Radford Neal)
-- Blogs:
-  - <http://andrewgelman.com/>
-
-## Predictive Inference
-
-## Posterior Predictive Distribution
-
-$$
-p(\tilde{y}|y) = \int_\theta p(\tilde{y}|\theta) p(\theta|y) d\theta
-$$
-
+  
 ## Poisson
 
 ```{r stan_poisson, message=FALSE, warning=FALSE, results='hide', cache=TRUE}
@@ -1258,9 +1223,89 @@ This gives us a point estimate for $\theta$ with no indication of uncertainty. H
 The assumption implicit in this approach is that in the absence of data all parameter values are equally probable.
 </aside>
 
+## Maud's Bayesian Answers {.center}
+
+- What is the hit rate? **`r sprintf("%.1f", estimate_hit_rate * 100)`%**
+- What is the RTP? **`r sprintf("%.1f", estimate_rtp * 100)`%**
+- What is the hit rate for each winning combination?
+    - **frequent low paying combinations (every `r format(1 / rtp_summary[1, 1], digits = 0)` spins for 1x)**
+    - **rare high paying combinations (every `r format(1 / rtp_summary[6, 1], digits = 3)` spins for 100x)**
+
+<aside class="notes">
+So, returning to Maud's three burning questions, not only have we managed to obtain point estimates to answer each of them, but we have actually generated distributions for each of these quantities, which are enormously more informative. With this kind of information in hand it becomes relatively simple to reverse engineer such a game.
+</aside>
+
+
+
+## Monte Carlo (Plain Vanilla Version)
+
+Generate independent samples of $\theta^{(i)}$.
+
+- Need to have $p(\theta^{(m)} | y, X)$.
+
+```{r echo=FALSE, warning=FALSE, fig.height=4.5, fig.align='right'}
+set.seed(13)
+
+parameters <- tibble(
+  x1 = c(NA, rnorm(20)),
+  y1 = c(NA, rnorm(20))
+) %>% mutate(
+  x2 = c(na.omit(x1), NA),
+  y2 = c(na.omit(y1), NA)
+)
+
+ggplot(parameters) +
+  geom_point(aes(x = x1, y = y1), color = "red", size = 3) +
+  labs(x = "", y = "") +
+  theme_classic() +
+  theme(axis.text = element_blank(), axis.ticks = element_blank(), axis.line = element_blank(), aspect.ratio = 1)
+```
+
+<aside class="notes">
+Monte Carlo is an alternative technique which generates independent, random samples from the parameter space.
+
+Although it's better in higher dimensions than the grid approximation, it's still far from perfect.
+
+However there's yet another alternative...
+
+**Note:**
+
+The objective is to jump around parameter space in such a way that the probability of being at a point is proportional to the distribution.
+
+Efficient algorithms exist for doing this with simple distributions. However, any non-trivial distribution will generally require you to apply something like rejection sampling. And to make that efficient we'd need to know the maximum value of the distribution.
+</aside>
+
+## Markov Chain Monte Carlo (MCMC)
+
+Generate a series of samples: $\theta^1$, $\theta^2$, $\theta^3$, ... $\theta^M$.
+
+- $\theta^m$ depends on $\theta^{m-1}$.
+- Need to have $p(\theta^{m} | \theta^{m-1}, y, X)$.
+
+```{r echo=FALSE, warning=FALSE, fig.height=4.5, fig.align='right'}
+ggplot(parameters) +
+  geom_segment(aes(x = x1, y = y1, xend  = x2, yend = y2), lty = "dashed") +
+  geom_point(aes(x = x1, y = y1), color = "red", size = 3) +
+  labs(x = "", y = "") +
+  theme_classic() +
+  theme(axis.text = element_blank(), axis.ticks = element_blank(), axis.line = element_blank(), aspect.ratio = 1)
+```
+
+<aside class="notes">
+Markov Chain Monte Carlo generates a sequence of samples where each new sample is random but also dependent on the previous sample.
+</aside>
+
 ## ShinyStan
 
 library(shinystan)
 launch_shinystan(fit)
 #
 # Diagnose -> PPcheck "Posterior predictive check" (look at distribution of observed data versus replications - do they look similar? "If our model is a good fit then we should be able to use it to generate data that looks a lot like the data we observed.")
+
+## Resources
+
+- http://mc-stan.org/workshops/
+- <a href="http://mc-stan.org/">Stan web site</a>
+- <a href="http://www.mcmchandbook.net/HandbookChapter5.pdf">MCMC Using Hamiltonian Dynamics</a> (Radford Neal)
+- Blogs:
+  - <http://andrewgelman.com/>
