@@ -1,4 +1,4 @@
-The talk slides are available [here](https://datawookie.github.io/talk-bayesian-leap/).
+The talk slides are available [here](https://datawookie.github.io/talk-first-steps-with-stan/).
 
 ## Presentation
 
