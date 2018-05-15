@@ -3,7 +3,7 @@ title: First Steps with Stan
 subtitle: "Maud goes to Vegas"
 author: Andrew B. Collier
 location: eRum (Budapest)
-date: 15 May 2018
+date: "15 May 2018 at 16:00"
 title_logo_toptal: true
 title_logo_exegetic: false
 output: 
@@ -15,8 +15,6 @@ output:
     css: datawookie-reveal-markdown.css
 editor_options: 
   chunk_output_type: console
----
-
 ---
 
 <img src="img/satrday-2017-banner.png" width="85%">
