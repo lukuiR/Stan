@@ -129,6 +129,24 @@ ul > li > code {
   display: block;
 }
 
+/* HEADERS & FOOTERS ------------------------------------------------------- */
+
+#header-left {
+    position: absolute;
+    top: 0%;
+    left: 0%;
+}
+#header-right {
+    position: absolute;
+    top: 0%;
+    right: 0%;
+}
+#footer-left {
+    position: absolute;
+    bottom: 0%;
+    left: 0%;
+}
+
 /* BLOCKQUOTE -------------------------------------------------------------- */
 
 .reveal blockquote {
