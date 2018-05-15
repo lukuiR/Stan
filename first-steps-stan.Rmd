@@ -8,9 +8,8 @@ title_logo_toptal: true
 title_logo_exegetic: false
 output: 
   revealjs::revealjs_presentation:
-    self_contained: false
+    self_contained: true
     transition: none
-    reveal_plugins: ["notes"]
     template: datawookie-reveal-markdown-template.html
     css: datawookie-reveal-markdown.css
 editor_options: 
