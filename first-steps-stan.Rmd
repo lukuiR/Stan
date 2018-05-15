@@ -186,7 +186,7 @@ Fortunately Maud has diligently recorded her gambling statistics. As a result we
 
 ```{r}
 spin <- sessions %>%
-  select(details) %>%
+  select(session, details) %>%
   unnest() %>%
   mutate(success = as.integer(payout > 0))
 ```
