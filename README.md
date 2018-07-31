@@ -8,3 +8,6 @@ Rename the resulting file to `index.html` and commit to the repository.
 
 - https://www.youtube.com/watch?v=kr_pAPS_oyM
 - https://arxiv.org/pdf/1111.4246.pdf
+
+K-fold stan:
+- https://www.r-bloggers.com/k-fold-cross-validation-in-stan/
